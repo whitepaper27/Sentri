@@ -1,0 +1,115 @@
+# Sentri Configuration
+# Copy this file to config/sentri.yaml and fill in your values.
+# Secrets should be set via environment variables (SENTRI_*), not in this file.
+# Passwords: SENTRI_DB_<NAME>_PASSWORD (e.g., SENTRI_DB_DEV_DB_01_PASSWORD)
+
+email:
+  imap_server: imap.gmail.com
+  imap_port: 993
+  username: your-email@gmail.com
+  use_ssl: true
+  password: ""  # Set SENTRI_EMAIL_PASSWORD env var instead
+  # SMTP (outbound — approval emails)
+  smtp_server: smtp.gmail.com
+  smtp_port: 587
+  use_tls: true
+  # Polling settings
+  poll_interval: 60 # Check every 60 seconds
+  mark_as_read: true # Mark emails as read after processing
+
+  # Folder to monitor
+  folder: INBOX # Or create a folder like "DBA-Alerts"
+
+databases:
+  - name: my-oracle-dev
+    db_engine: oracle              # oracle, postgres, snowflake, sqlserver
+    connection_string: oracle://user@host:1521/DBNAME
+    environment: DEV
+    username: system               # Per-DB username (overrides URL)
+    password: ""                   # Set SENTRI_DB_MY_ORACLE_DEV_PASSWORD env var
+    # aliases: [DEVDB, dev-db-01]      # Alternate names in alert emails
+    # autonomy_level: AUTONOMOUS       # Defaults based on environment
+    # oracle_version: "19c"
+    # architecture: STANDALONE         # STANDALONE, CDB, RAC
+    # critical_schemas: ""
+    # business_owner: ""
+    # dba_owner: ""
+
+  # Add more databases as needed:
+  # - name: UAT-DB-03
+  #   db_engine: oracle
+  #   connection_string: oracle://sentri_agent@uat-host:1521/UATDB
+  #   environment: UAT
+  #   username: sentri_agent
+  #   password: ""  # Set SENTRI_DB_UAT_DB_03_PASSWORD env var
+
+  # PostgreSQL example:
+  # - name: analytics-pg
+  #   db_engine: postgres
+  #   connection_string: postgresql://sentri@pg-host:5432/analytics
+  #   environment: DEV
+
+  # Snowflake example:
+  # - name: warehouse-sf
+  #   db_engine: snowflake
+  #   connection_string: snowflake://user@account/warehouse
+  #   environment: UAT
+
+  # SQL Server example:
+  # - name: erp-mssql
+  #   db_engine: sqlserver
+  #   connection_string: mssql://user@sql-host:1433/erpdb
+  #   environment: PROD
+
+approvals:
+  slack_webhook_url: "" # Set SENTRI_SLACK_WEBHOOK_URL env var
+  approval_timeout: 3600 # 1 hour
+  email_enabled: true
+  approval_recipients: "" # Comma-separated; defaults to email.username
+
+monitoring:
+  log_level: INFO
+  scout_poll_interval: 60
+  orchestrator_poll_interval: 10
+  profile_refresh_hours: 24           # Re-profile databases every N hours (0 = startup only)
+
+# v2.0: Learning engine + LLM configuration
+learning:
+  enabled: true                    # Full observe→propose→judge→apply pipeline
+  min_observations: 5              # Min observations before proposing improvements
+  judge_count: 3                   # Number of LLM judges for consensus
+  judge_agreement: 2               # Min judges that must agree
+  monitoring_days: 30              # Days to monitor after an improvement
+
+  # Default LLM provider (used when role-specific not set)
+  llm_provider: "gemini"           # "claude", "openai", or "gemini"
+  llm_model: ""                    # Leave blank for provider default
+
+  # Role-specific provider overrides (optional)
+  researcher_provider: ""          # Falls back to llm_provider
+  judge_provider: "diverse"        # "diverse" = use all available providers
+
+  # Per-provider API keys: set via environment variables
+  # SENTRI_CLAUDE_API_KEY   → Claude (Anthropic)
+  # SENTRI_OPENAI_API_KEY   → OpenAI (GPT)
+  # SENTRI_GEMINI_API_KEY   → Gemini (Google)
+
+  # Cost control
+  daily_cost_limit: 5.0            # USD per day across all providers
+
+# v5.1b: Notification adapters (in addition to email/slack above)
+# notifications:
+#   adapters:
+#     - type: webhook
+#       enabled: true
+#       url: https://hooks.slack.com/services/YOUR/WEBHOOK/URL
+#       headers:
+#         Content-Type: application/json
+#     - type: webhook
+#       enabled: false
+#       url: https://your-company.webhook.office.com/webhookb2/...
+#       headers:
+#         Content-Type: application/json
+#     - type: pagerduty
+#       enabled: false
+#       routing_key: "your-pagerduty-integration-key"
