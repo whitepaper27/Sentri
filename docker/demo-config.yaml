@@ -1,0 +1,25 @@
+# Sentri Demo Configuration
+# Pre-configured for the Docker demo environment.
+# No IMAP, no LLM key required. Template-based fixes only.
+
+email:
+  imap_server: ""
+  username: ""
+  password: ""
+  poll_interval: 60
+
+databases:
+  - name: demo-oracle
+    connection_string: oracle://sentri_demo:sentri_demo@oracle:1521/FREEPDB1
+    environment: DEV
+    aliases:
+      - DEMO-ORACLE
+      - demo-oracle
+      - FREEPDB1
+
+approvals:
+  email_enabled: false
+
+monitoring:
+  log_level: INFO
+  scout_poll_interval: 60

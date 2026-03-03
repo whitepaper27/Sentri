@@ -145,6 +145,41 @@ sentri start            # Start monitoring
 
 ---
 
+## Docker Demo (Try Without Installing)
+
+See the full pipeline in action — no Oracle install, no email, no LLM key needed:
+
+```bash
+cd docker
+docker-compose up --build
+```
+
+This starts Oracle XE + Sentri. Once Oracle is healthy, Sentri runs the demo automatically:
+
+```
+Sentri Demo
+  Alert type: tablespace_full
+  Database:   demo-oracle (DEV)
+
+  [ok] DETECTED    Alert injected
+  [ok] VERIFIED    Confirmed (confidence: 0.80)
+  [ok] PRE_FLIGHT  Safety Mesh: 5/5 checks passed
+  [ok] EXECUTING   ALTER TABLESPACE ADD DATAFILE SIZE 10G
+  [ok] COMPLETED   Fix applied successfully
+
+  Duration: 7.0s
+```
+
+Or run the demo locally if you already have an Oracle database:
+
+```bash
+sentri demo                          # Uses first DEV database
+sentri demo --alert-type temp_full   # Try different alert types
+sentri demo --dry-run                # See what would happen
+```
+
+---
+
 ## Add a New Alert Type (Zero Code)
 
 Drop a `.md` file in `~/.sentri/alerts/`:
@@ -269,6 +304,11 @@ sentri show <workflow_id>                # Full workflow detail with SQL
 sentri approve <workflow_id>             # Approve a pending workflow
 sentri approve <id> --deny --reason "..."  # Deny with reason
 sentri resolve <id> --reason "Fixed manually"  # Manual DBA resolution
+
+# Demo
+sentri demo                              # Run demo (full pipeline, real Oracle)
+sentri demo --alert-type temp_full       # Demo a different alert type
+sentri demo --dry-run                    # Preview without executing
 
 # Operations
 sentri audit                             # View audit log

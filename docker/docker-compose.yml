@@ -1,0 +1,31 @@
+services:
+  oracle:
+    image: gvenzl/oracle-xe:21-slim
+    environment:
+      ORACLE_PASSWORD: Oracle123
+      APP_USER: sentri_demo
+      APP_USER_PASSWORD: sentri_demo
+    ports:
+      - "1521:1521"
+    volumes:
+      - ./oracle-init:/container-entrypoint-initdb.d
+      - oracle-data:/opt/oracle/oradata
+    healthcheck:
+      test: ["CMD", "healthcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+
+  sentri:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    depends_on:
+      oracle:
+        condition: service_healthy
+    environment:
+      SENTRI_DB_DEMO_ORACLE_PASSWORD: sentri_demo
+    command: ["demo", "--database", "demo-oracle"]
+
+volumes:
+  oracle-data:

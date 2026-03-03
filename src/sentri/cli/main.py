@@ -22,6 +22,7 @@ def cli():
 # Import and register subcommands
 from sentri.cli.approve_cmd import approve_cmd  # noqa: E402
 from sentri.cli.audit_cmd import audit_cmd  # noqa: E402
+from sentri.cli.demo_cmd import demo_cmd  # noqa: E402
 from sentri.cli.cleanup_cmd import cleanup_cmd  # noqa: E402
 from sentri.cli.db_cmd import db_cmd  # noqa: E402
 from sentri.cli.init_cmd import init_cmd  # noqa: E402
@@ -54,3 +55,4 @@ cli.add_command(rollback_improvement_cmd)
 cli.add_command(cleanup_cmd)
 cli.add_command(approve_cmd)
 cli.add_command(resolve_cmd)
+cli.add_command(demo_cmd)
