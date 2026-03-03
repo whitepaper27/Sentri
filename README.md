@@ -1,76 +1,94 @@
-# Sentri
+# Sentri — AI-Powered Autonomous DBA Agent
 
-**AI-Powered L3 DBA Agent System** -- Autonomous Oracle database issue detection and resolution.
+> Detects, diagnoses, and fixes Oracle database problems automatically.
+> Drop a `.md` file to add new alert types — zero code changes.
 
-Sentri monitors your DBA alert emails, verifies issues against live Oracle databases, and automatically resolves them (DEV/UAT) or routes for human approval (PROD). Zero-touch remediation for common database alerts.
+![CI](https://github.com/sahilkhan03/sentri/actions/workflows/ci.yml/badge.svg)
+![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)
+![License](https://img.shields.io/badge/license-Apache%202.0-green)
+![Tests](https://img.shields.io/badge/tests-847%20passed-brightgreen)
+
+---
+
+## What Sentri Does
+
+Sentri monitors your DBA alert emails, verifies problems against real database state, investigates using 12 specialized DBA tools, generates multiple fix candidates, scores them against configurable criteria, and executes the best option — with full rollback guarantee and immutable audit trail.
+
+**Works without an LLM API key** using template-based fixes. Add Claude, OpenAI, or Gemini for intelligent investigation and multi-candidate scoring.
+
+### Who Is It For?
+
+- DBA teams managing 1–50 Oracle databases
+- Running OEM or monitoring that sends email alerts
+- Want autonomous fixes for common issues (tablespace, temp, slow SQL, blocking sessions)
+- Comfortable with Python, direct database connections, YAML config
+
+---
 
 ## How It Works
 
 ```
-DBA Alert Email
-     |
-     v
- +-------+     +---------+     +--------------+     +----------+
- | Scout  | --> | Auditor | --> | Orchestrator | --> | Executor |
- | (parse)|    | (verify) |    |   (route)    |    |  (fix)   |
- +-------+     +---------+     +--------------+     +----------+
-                                      |
-                                      v
-                              Approval Flow (PROD)
+  ┌──────────┐   ┌──────────────┐
+  │  SCOUT   │   │  PROACTIVE   │
+  │ (email)  │   │  (scheduled) │
+  └────┬─────┘   └──────┬───────┘
+       └───────┬────────┘
+               v
+  ┌──────────────────────────┐
+  │       SUPERVISOR         │  Deterministic router
+  │  (correlate + route)     │  (not an LLM call)
+  └──────────┬───────────────┘
+             |
+    ┌────────┼──────────┬──────────┐
+    v        v          v          v
+ Storage   SQL       RCA       Future
+ Agent     Tuning    Agent     Agent
+           Agent
+    └────────┼──────────┼──────────┘
+             v
+  ┌──────────────────────────┐
+  │      SAFETY MESH         │  5 structural checks
+  │  (policy, blast radius,  │  (LLM cannot bypass)
+  │   conflicts, rollback)   │
+  └──────────┬───────────────┘
+             v
+  ┌──────────────────────────┐
+  │      EXECUTOR            │  Pre/post metrics
+  │  (execute + rollback)    │  Auto-rollback on failure
+  └──────────────────────────┘
 ```
 
-1. **Scout** monitors your alert inbox via IMAP, matches emails against known patterns
-2. **Auditor** connects to the target Oracle DB (read-only) and verifies the issue is real
-3. **Orchestrator** checks the environment tier and routes the workflow
-4. **Executor** applies the fix with rollback capability, then validates the result
-
-## Supported Alert Types
-
-| Alert | Detection | Auto-Fix |
-|-------|-----------|----------|
-| Tablespace Full | ORA-01652, usage % alerts | `ALTER TABLESPACE ADD DATAFILE` |
-| Archive Destination Full | ORA-19809, archive % alerts | Purge expired archivelogs via RMAN |
-| Temp Tablespace Full | ORA-01652 (temp), temp usage % | `ALTER TABLESPACE ADD TEMPFILE` |
-| Listener Down | TNS-12541, listener status alerts | `lsnrctl start` |
-| Archive Gap (Data Guard) | SCN gap alerts | `ALTER DATABASE RECOVER` |
-
-## Environment Tiers
-
-| Environment | Autonomy | Behavior |
-|-------------|----------|----------|
-| **DEV** | AUTONOMOUS | Auto-execute all fixes, notify after |
-| **UAT** | SUPERVISED | Auto-execute low-risk, require approval for high-risk |
-| **PROD** | ADVISORY | Always require human approval before execution |
+1. **Scout** monitors your IMAP inbox for DBA alert emails
+2. **Proactive Agent** runs scheduled health checks (stale stats, tablespace trends, etc.)
+3. **Supervisor** correlates alerts on the same database and routes to the right specialist
+4. **Specialist agents** investigate with 12 DBA tools, then generate multiple fix candidates
+5. **Safety Mesh** enforces 5 structural checks before any SQL touches the database
+6. **Executor** runs the fix with pre/post metrics, auto-rollback on failure
+7. **Analyst** learns from outcomes to improve future decisions
 
 ---
 
-## Installation
+## Quick Start
+
+### 1. Install
 
 ```bash
-pip install sentri
-```
-
-Or install from source:
-
-```bash
-git clone https://github.com/your-org/sentri.git
+git clone https://github.com/sahilkhan03/sentri.git
 cd sentri
-pip install -e .
+pip install -e ".[dev,llm]"
 ```
 
 **Requirements**: Python 3.10+
 
-## Quick Start
-
-### 1. Initialize
+### 2. Initialize
 
 ```bash
 sentri init
 ```
 
-This creates the `~/.sentri/` directory with default policy files, a SQLite database, and a config template.
+Creates the `~/.sentri/` directory with default policy files, SQLite database, and config template.
 
-### 2. Configure Databases
+### 3. Configure
 
 Edit `~/.sentri/config/sentri.yaml`:
 
@@ -85,185 +103,215 @@ databases:
   - name: PROD-DB-07
     connection_string: oracle://sentri_agent@prod-scan:1521/PRODDB
     environment: PROD
-    username: sentri_ro                    # Per-DB username (overrides URL)
-    aliases: [PRODDB, prod-db-07, PROD07]  # Names this DB may appear as in emails
-
-  - name: UAT-DB-03
-    connection_string: oracle://sentri_agent@uat-db-03:1521/UATDB
-    environment: UAT
-    aliases: [UATDB, uat-db-03]
+    username: sentri_ro
+    aliases: [PRODDB, prod-db-07, PROD07]
 
   - name: DEV-DB-01
     connection_string: oracle://sentri_agent@dev-db-01:1521/DEVDB
     environment: DEV
-    username: sentri_admin                 # Full-access user for DEV
     aliases: [DEVDB, dev-db-01]
 
 approvals:
-  slack_webhook_url: ""  # Or set SENTRI_SLACK_WEBHOOK_URL env var
+  email_enabled: true
+  approval_recipients: ["dba-team@company.com"]
   approval_timeout: 3600
 
 monitoring:
   log_level: INFO
   scout_poll_interval: 60
-  orchestrator_poll_interval: 10
 ```
 
-### 3. Set Credentials
+### 4. Set Credentials
 
-Passwords and sensitive values are set via environment variables, never stored in YAML:
+Passwords are set via environment variables, never stored in config:
 
 ```bash
-# Email password
 export SENTRI_EMAIL_PASSWORD="your-imap-password"
 
-# Database passwords (pattern: SENTRI_DB_<NAME>_PASSWORD)
-# Replace hyphens with underscores, uppercase the name
+# Pattern: SENTRI_DB_<NAME>_PASSWORD (uppercase, hyphens → underscores)
 export SENTRI_DB_PROD_DB_07_PASSWORD="prod-password"
-export SENTRI_DB_UAT_DB_03_PASSWORD="uat-password"
 export SENTRI_DB_DEV_DB_01_PASSWORD="dev-password"
 
-# Optional: override username via env var
-export SENTRI_DB_PROD_DB_07_USERNAME="sentri_readonly"
-
-# Slack webhook (optional)
-export SENTRI_SLACK_WEBHOOK_URL="https://hooks.slack.com/services/..."
+# Optional: LLM provider
+export ANTHROPIC_API_KEY="sk-..."   # or OPENAI_API_KEY or GOOGLE_API_KEY
 ```
 
-### 4. Verify Connectivity
+### 5. Start
 
 ```bash
-# List all configured databases
-sentri db list
-
-# Test Oracle connectivity
-sentri db test
-
-# Test a specific database
-sentri db test --name PROD-DB-07
+sentri db test          # Verify Oracle connectivity
+sentri start            # Start monitoring
 ```
-
-### 5. Start Monitoring
-
-```bash
-sentri start
-```
-
-Sentri runs in the foreground. It starts the Scout (email polling) and Orchestrator (workflow processing) in parallel.
-
-Press `Ctrl+C` to stop gracefully.
 
 ---
 
-## Database Configuration Reference
+## Add a New Alert Type (Zero Code)
 
-Each database entry in `sentri.yaml` supports these fields:
+Drop a `.md` file in `~/.sentri/alerts/`:
 
-```yaml
-databases:
-  - name: PROD-DB-07                       # REQUIRED: Unique identifier
-    connection_string: oracle://user@host:port/service  # REQUIRED: Oracle DSN
-    environment: PROD                      # REQUIRED: DEV, UAT, or PROD
-    # --- Optional fields below ---
-    username: sentri_ro                    # Override user from URL
-    aliases: [PRODDB, prod-db-07]          # Alternate names in alert emails
-    autonomy_level: ADVISORY               # AUTONOMOUS, SUPERVISED, ADVISORY
-    oracle_version: "19c"
-    architecture: RAC                      # STANDALONE, CDB, RAC
-    critical_schemas: "FINANCE,HR"         # Comma-separated
-    business_owner: "Jane Smith"
-    dba_owner: "John Doe"
+```markdown
+---
+alert_type: tablespace_full
+severity: HIGH
+risk_level: MEDIUM
+action_type: ADD_DATAFILE
+---
+
+## Email Pattern
+(?i)tablespace\s+(\S+)\s+.*?(\d+(?:\.\d+)?)\s*%.*?(?:on|database)\s+(\S+)
+
+## Verification Query
+SELECT tablespace_name, ROUND(used_percent,1) as used_percent
+FROM dba_tablespace_usage_metrics
+WHERE tablespace_name = :tablespace_name
+
+## Forward Action
+ALTER TABLESPACE :tablespace_name ADD DATAFILE SIZE 10G AUTOEXTEND ON NEXT 1G MAXSIZE 32G
+
+## Rollback Action
+ALTER TABLESPACE :tablespace_name DROP DATAFILE ':new_datafile_path'
 ```
 
-### Connection String Format
+No enum, no code change, no restart. Sentri picks it up on the next poll cycle.
 
-```
-oracle://username@hostname:port/service_name
-```
+---
 
-The `username` in the URL is used by default. To override it per-database, set the `username` field or use the `SENTRI_DB_<NAME>_USERNAME` env var.
+## Features
 
-### Database Name Aliases
+### Intelligence
 
-Alert emails may refer to a database by different names. The `aliases` field maps alternate names to the canonical config name:
+- **12 DBA investigation tools** — tablespace info, SQL plans, session diagnostics, wait events, table stats, index info, top SQL
+- **Argue/select pattern** — generates 3–5 fix candidates, LLM judge scores each against configurable criteria
+- **Ground truth RAG** — verified Oracle syntax docs prevent SQL hallucination
+- **Short-term memory** (24h context) + **long-term patterns** (90-day history)
+- **Three-level fallback** — Agentic (LLM + tools) → One-shot (LLM only) → Template (zero LLM cost)
 
-```yaml
-- name: PROD-DB-07                    # Canonical name in Sentri
-  aliases: [PRODDB, prod-db-07, P07]  # Names that may appear in emails
-```
+### Safety
 
-When Scout parses an email containing "PRODDB", it resolves the alias to "PROD-DB-07" and routes the workflow correctly.
+- **5-check Safety Mesh** — policy gate, conflict detection, blast radius, circuit breaker, rollback guarantee
+- **Structural enforcement** — the architecture prevents dangerous SQL from reaching execution, not prompts
+- **Confidence-based routing** — auto-execute in DEV, require approval in PROD
+- **Auto-rollback** on post-execution validation failure
+- **Immutable audit trail** for every action
 
-### Scaling to Many Databases
+### Autonomy
 
-The YAML config scales to hundreds of databases. For large deployments:
+- **4 specialist agents** — Storage, SQL Tuning, RCA (root cause analysis), Proactive Health
+- **Proactive health checks** — catch problems BEFORE they trigger alerts (stale stats, tablespace trends, etc.)
+- **Cost gate** — historical success rate determines LLM depth (most alerts = zero LLM cost)
+- **Email approval flow** — DBA replies APPROVED/DENIED to approval emails
 
-```yaml
-databases:
-  # Minimal config per DB (3 required fields + password env var)
-  - name: DB-001
-    connection_string: oracle://sentri@db001:1521/SVC001
-    environment: DEV
+### Extensibility
 
-  - name: DB-002
-    connection_string: oracle://sentri@db002:1521/SVC002
-    environment: DEV
+- **`.md`-driven everything** — alerts, health checks, policies, agent behavior
+- **Multi-provider LLM** — Claude, OpenAI, Gemini, or no LLM at all
+- **9 alert types** out of the box, add more by dropping a file
+- **7 proactive health checks** included
 
-  # ... repeat for all databases
-```
+---
 
-Set all passwords at once:
+## Supported Alert Types
 
-```bash
-export SENTRI_DB_DB_001_PASSWORD="pass1"
-export SENTRI_DB_DB_002_PASSWORD="pass2"
-# ...
-```
+| Alert | Status | Specialist |
+|-------|--------|------------|
+| Tablespace Full | Working | Storage Agent |
+| Temp Tablespace Full | Ready | Storage Agent |
+| Archive Destination Full | Ready | Storage Agent |
+| High Undo Usage | Ready | Storage Agent |
+| Long Running SQL | Ready | SQL Tuning Agent |
+| CPU High | Ready | SQL Tuning Agent |
+| Session Blocker | Ready | RCA Agent |
+| Listener Down | Planned | — |
+| Archive Gap (Data Guard) | Planned | — |
+
+## Proactive Health Checks
+
+| Check | Schedule | Routes To |
+|-------|----------|-----------|
+| Stale Statistics | Every 6 hours | SQL Tuning Agent |
+| Tablespace Trend | Every 6 hours | Storage Agent |
+| Index Usage | Daily | SQL Tuning Agent |
+| Redo Log Sizing | Every 6 hours | Storage Agent |
+| Temp Growth Trend | Every 6 hours | Storage Agent |
+| Password Expiry | Daily | — (escalate) |
+| Backup Freshness | Daily | — (escalate) |
+
+---
+
+## Environment Tiers
+
+| Environment | Autonomy | Behavior |
+|-------------|----------|----------|
+| **DEV** | AUTONOMOUS | Auto-execute all fixes, notify after |
+| **UAT** | SUPERVISED | Auto-execute low-risk, require approval for high-risk |
+| **PROD** | ADVISORY | Always require human approval before execution |
 
 ---
 
 ## CLI Commands
 
 ```bash
+# Setup
 sentri init                              # Initialize ~/.sentri/ directory
+sentri db list                           # List configured databases
+sentri db test                           # Test Oracle connectivity
+
+# Monitoring
 sentri start                             # Start the monitoring daemon
-sentri db list                           # List all configured databases
-sentri db test                           # Test connectivity to all databases
-sentri db test --name DEV-DB-01          # Test a specific database
-sentri stats                             # Show workflow statistics
-sentri list                              # List recent workflows
+
+# Workflows
+sentri stats                             # Workflow statistics + success rate
+sentri list                              # Recent workflows
 sentri list --status AWAITING_APPROVAL   # Filter by status
-sentri show <workflow_id>                # Show workflow details
+sentri show <workflow_id>                # Full workflow detail with SQL
+
+# Approvals
+sentri approve <workflow_id>             # Approve a pending workflow
+sentri approve <id> --deny --reason "..."  # Deny with reason
+sentri resolve <id> --reason "Fixed manually"  # Manual DBA resolution
+
+# Operations
 sentri audit                             # View audit log
-sentri install-service                   # Generate systemd service file
+sentri show-profile <db>                 # Database profile
+sentri profiles                          # All profiled databases
+sentri install-service                   # Generate systemd service config
 ```
 
-## Runtime Directory
+---
 
+## Configuration Reference
+
+Each database entry in `sentri.yaml` supports:
+
+```yaml
+databases:
+  - name: PROD-DB-07                       # REQUIRED: Unique identifier
+    connection_string: oracle://user@host:port/service  # REQUIRED
+    environment: PROD                      # REQUIRED: DEV, UAT, or PROD
+    # --- Optional ---
+    username: sentri_ro                    # Override user from connection string
+    aliases: [PRODDB, prod-db-07]          # Alternate names in alert emails
+    autonomy_level: ADVISORY               # Per-DB override
+    oracle_version: "19c"
+    architecture: RAC                      # STANDALONE, CDB, RAC
 ```
-~/.sentri/
-├── brain/              # Core policies (autonomy, state machine, locking)
-├── agents/             # Agent behavior configurations
-├── alerts/             # Alert patterns (regex, SQL, forward/rollback actions)
-├── environments/       # Database inventory
-├── workflows/          # Workflow specifications
-├── data/sentri.db      # SQLite database (WAL mode)
-├── logs/sentri.log     # Application log
-└── config/sentri.yaml  # Your configuration
-```
 
-## Environment Variables
+### Environment Variables
 
-| Variable | Purpose | Example |
-|----------|---------|---------|
-| `SENTRI_EMAIL_PASSWORD` | IMAP email password | |
-| `SENTRI_DB_<NAME>_PASSWORD` | Per-database Oracle password | `SENTRI_DB_PROD_DB_07_PASSWORD` |
-| `SENTRI_DB_<NAME>_USERNAME` | Per-database Oracle username override | `SENTRI_DB_PROD_DB_07_USERNAME` |
-| `SENTRI_SLACK_WEBHOOK_URL` | Slack notification webhook | |
-| `SENTRI_LOG_LEVEL` | Logging level (default: INFO) | `DEBUG`, `WARNING` |
+| Variable | Purpose |
+|----------|---------|
+| `SENTRI_EMAIL_PASSWORD` | IMAP email password |
+| `SENTRI_DB_<NAME>_PASSWORD` | Per-database Oracle password |
+| `SENTRI_DB_<NAME>_USERNAME` | Per-database Oracle username override |
+| `SENTRI_SLACK_WEBHOOK_URL` | Slack notification webhook |
+| `ANTHROPIC_API_KEY` | Claude API key (optional) |
+| `OPENAI_API_KEY` | OpenAI API key (optional) |
+| `GOOGLE_API_KEY` | Gemini API key (optional) |
 
-The `<NAME>` pattern: uppercase the database name and replace hyphens with underscores.
-`PROD-DB-07` becomes `PROD_DB_07`, so the env var is `SENTRI_DB_PROD_DB_07_PASSWORD`.
+The `<NAME>` pattern: uppercase the database name, replace hyphens with underscores.
+`PROD-DB-07` becomes `SENTRI_DB_PROD_DB_07_PASSWORD`.
+
+---
 
 ## Customizing Policies
 
@@ -271,46 +319,48 @@ Sentri's behavior is driven by `.md` policy files that DBAs can edit without wri
 
 ### Alert Patterns (`~/.sentri/alerts/`)
 
-Each alert type is a markdown file containing:
-- **Email Pattern**: Regex to match incoming alert emails
-- **Extracted Fields**: What data to pull from the regex match
-- **Verification Query**: SQL to confirm the issue on the live database
-- **Tolerance**: How much drift is acceptable between email and reality
-- **Forward Action**: SQL to fix the issue
-- **Rollback Action**: SQL to undo the fix if it fails
-- **Validation Query**: SQL to confirm the fix worked
+Each `.md` file defines: email pattern (regex), verification query (SQL), forward action (fix SQL), rollback action (undo SQL), and validation query (confirm fix). See the [alerts/ directory](alerts/) for examples.
 
-Example from `alerts/tablespace_full.md`:
+### Health Checks (`~/.sentri/checks/`)
 
-```markdown
-## Email Pattern
-(?i)tablespace\s+(\S+)\s+.*?(\d+(?:\.\d+)?)\s*%\s*(?:full|capacity|used).*?(?:on|database)\s+(\S+)
-
-## Forward Action
-ALTER TABLESPACE :tablespace_name ADD DATAFILE SIZE 10G AUTOEXTEND ON NEXT 1G MAXSIZE 32G;
-
-## Rollback Action
-ALTER TABLESPACE :tablespace_name DROP DATAFILE ':new_datafile_path';
-```
+Same pattern as alerts — drop a `.md` file with a health query, threshold, and recommended action. See the [checks/ directory](checks/) for examples.
 
 ### Brain Policies (`~/.sentri/brain/`)
 
-- `autonomy_levels.md` -- Which environments auto-execute vs. require approval
-- `state_machine.md` -- Valid workflow state transitions
-- `locking_rules.md` -- Prevent concurrent operations on the same resource
-- `global_policy.md` -- Safety constraints and override rules
+- `autonomy_levels.md` — Which environments auto-execute vs. require approval
+- `routing_rules.md` — How alerts map to specialist agents
+- `state_machine.md` — Valid workflow state transitions
+- `locking_rules.md` — Prevent concurrent operations on the same resource
+- `global_policy.md` — Safety constraints and override rules
 
 Edit any `.md` file to change behavior. Changes take effect on next policy reload.
+
+---
+
+## Runtime Directory
+
+```
+~/.sentri/
+├── brain/              # Core policies (autonomy, routing, safety)
+├── agents/             # Agent behavior configurations
+├── alerts/             # Alert patterns (drop .md to add new types)
+├── checks/             # Health check definitions (drop .md to add)
+├── environments/       # Database inventory
+├── workflows/          # Workflow specifications
+├── docs/oracle/        # Verified Oracle syntax (ground truth)
+├── data/sentri.db      # SQLite database (WAL mode)
+├── logs/sentri.log     # Application log
+└── config/sentri.yaml  # Your configuration
+```
+
+---
 
 ## Running as a Service
 
 ### Linux (systemd)
 
 ```bash
-# Generate the service file
 sentri install-service
-
-# Install and start
 sudo cp sentri.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable sentri
@@ -319,15 +369,15 @@ sudo systemctl start sentri
 
 ### Windows
 
-Run in the foreground or use a process manager like NSSM:
-
 ```bash
 sentri start
 ```
 
-## Workflow States
+Or use NSSM for background service management.
 
-Every alert goes through a state machine:
+---
+
+## Workflow States
 
 ```
 DETECTED --> VERIFYING --> VERIFIED --> EXECUTING --> COMPLETED
@@ -335,41 +385,40 @@ DETECTED --> VERIFYING --> VERIFIED --> EXECUTING --> COMPLETED
                 v              v            v
          VERIFICATION    AWAITING      ROLLED_BACK
             FAILED       APPROVAL          |
-                              |            v
-                              v          FAILED
-                          APPROVED
-                          DENIED
-                          TIMEOUT
+                           |    \          v
+                           v     v       FAILED
+                       APPROVED  DENIED
+                                 TIMEOUT
 ```
+
+---
 
 ## Development
 
 ```bash
-# Install with dev dependencies
-pip install -e ".[dev]"
+# Install with all dependencies
+pip install -e ".[dev,llm]"
 
-# Run tests
-pytest
-
-# Run tests with coverage
-pytest --cov=sentri
+# Run tests (847 tests)
+python -m pytest tests/ -x -q --ignore=tests/integration --ignore=tests/e2e
 
 # Lint
-ruff check src/
+ruff check src/ tests/
 
-# Type check
-mypy src/sentri/
+# Format check
+ruff format --check src/ tests/
 ```
+
+CI runs automatically on push/PR via GitHub Actions (Python 3.10, 3.11, 3.12).
 
 ## Tech Stack
 
 - **Python 3.10+**
-- **SQLite** (WAL mode) -- single-file persistence, zero setup
-- **python-oracledb** -- Oracle database connectivity (thin mode, no Oracle Client needed)
-- **Click** -- CLI framework
-- **Rich** -- Terminal formatting
-- **PyYAML** -- Configuration
+- **SQLite** (WAL mode) — single-file persistence, zero setup
+- **python-oracledb** — Oracle connectivity (thin mode, no Oracle Client needed)
+- **Click** + **Rich** — CLI framework with formatted terminal output
+- **Anthropic / OpenAI / Google AI** — optional LLM providers
 
 ## License
 
-Apache License 2.0 -- See [LICENSE](LICENSE)
+Apache License 2.0 — See [LICENSE](LICENSE)
