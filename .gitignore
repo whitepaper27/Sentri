@@ -36,6 +36,7 @@ htmlcov/
 # OS
 .DS_Store
 Thumbs.db
+ship.md
 
 # Secrets
 .env
