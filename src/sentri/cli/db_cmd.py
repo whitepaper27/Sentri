@@ -119,15 +119,30 @@ def _load_config_yaml() -> dict:
 def _save_config_yaml(data: dict) -> None:
     """Write config dict back to sentri.yaml."""
     CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
-    CONFIG_PATH.write_text(yaml.dump(data, default_flow_style=False, sort_keys=False), encoding="utf-8")
+    CONFIG_PATH.write_text(
+        yaml.dump(data, default_flow_style=False, sort_keys=False), encoding="utf-8"
+    )
 
 
 @db_cmd.command("add")
 @click.argument("name")
-@click.option("--connect", required=True, help="Connection string (oracle://user@host:port/service)")
-@click.option("--env", "environment", required=True, type=click.Choice(["DEV", "UAT", "PROD"], case_sensitive=False), help="Environment tier")
+@click.option(
+    "--connect", required=True, help="Connection string (oracle://user@host:port/service)"
+)
+@click.option(
+    "--env",
+    "environment",
+    required=True,
+    type=click.Choice(["DEV", "UAT", "PROD"], case_sensitive=False),
+    help="Environment tier",
+)
 @click.option("--aliases", default="", help="Comma-separated alias names (e.g. PRODDB,prod-01)")
-@click.option("--engine", default="oracle", type=click.Choice(["oracle", "postgres", "snowflake", "sqlserver"]), help="Database engine")
+@click.option(
+    "--engine",
+    default="oracle",
+    type=click.Choice(["oracle", "postgres", "snowflake", "sqlserver"]),
+    help="Database engine",
+)
 def db_add(name: str, connect: str, environment: str, aliases: str, engine: str):
     """Add a database to sentri.yaml.
 
@@ -139,7 +154,9 @@ def db_add(name: str, connect: str, environment: str, aliases: str, engine: str)
     # Check for duplicate
     for db in databases:
         if db.get("name") == name:
-            console.print(f"[red]Database '{name}' already exists. Use 'sentri db remove {name}' first.[/red]")
+            console.print(
+                f"[red]Database '{name}' already exists. Use 'sentri db remove {name}' first.[/red]"
+            )
             return
 
     entry: dict = {
@@ -159,7 +176,9 @@ def db_add(name: str, connect: str, environment: str, aliases: str, engine: str)
     name_key = name.upper().replace("-", "_")
     console.print(f"\n[green]Added database '{name}' ({environment.upper()})[/green]\n")
     console.print("Next steps:")
-    console.print(f"  1. Set password:  [bold]export SENTRI_DB_{name_key}_PASSWORD=your-password[/bold]")
+    console.print(
+        f"  1. Set password:  [bold]export SENTRI_DB_{name_key}_PASSWORD=your-password[/bold]"
+    )
     console.print(f"  2. Test:          [bold]sentri db test --name {name}[/bold]")
 
 

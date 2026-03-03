@@ -120,8 +120,14 @@ def _display_result(workflow_id: str, workflow_repo, start_time: float):
 
     # Determine what happened based on the terminal status
     terminal = {
-        "COMPLETED", "FAILED", "ROLLED_BACK", "ESCALATED",
-        "VERIFICATION_FAILED", "AWAITING_APPROVAL", "DENIED", "TIMEOUT",
+        "COMPLETED",
+        "FAILED",
+        "ROLLED_BACK",
+        "ESCALATED",
+        "VERIFICATION_FAILED",
+        "AWAITING_APPROVAL",
+        "DENIED",
+        "TIMEOUT",
     }
 
     if status == "VERIFICATION_FAILED":
@@ -134,7 +140,9 @@ def _display_result(workflow_id: str, workflow_repo, start_time: float):
                 confidence = vr.get("confidence", 0)
                 actual = vr.get("actual_metrics", {})
                 actual_pct = actual.get("used_percent", "?")
-                steps.append(("VERIFIED", f"Confirmed (actual: {actual_pct}%, confidence: {confidence:.2f})"))
+                steps.append(
+                    ("VERIFIED", f"Confirmed (actual: {actual_pct}%, confidence: {confidence:.2f})")
+                )
             except (ValueError, KeyError):
                 steps.append(("VERIFIED", "Confirmed"))
         else:
@@ -283,8 +291,12 @@ def demo_cmd(alert_type: str, database: str | None, dry_run: bool):
         console.print("[yellow]Dry run[/yellow] - would inject this alert:\n")
         console.print(f"  Subject: {subject}")
         console.print(f"  Body: {body[:200]}...")
-        console.print("\n  Pipeline: DETECTED > VERIFYING > VERIFIED > PRE_FLIGHT > EXECUTING > COMPLETED")
-        console.print(f"  Environment: {db_cfg.environment} = {'auto-execute' if db_cfg.environment == 'DEV' else 'require approval'}")
+        console.print(
+            "\n  Pipeline: DETECTED > VERIFYING > VERIFIED > PRE_FLIGHT > EXECUTING > COMPLETED"
+        )
+        console.print(
+            f"  Environment: {db_cfg.environment} = {'auto-execute' if db_cfg.environment == 'DEV' else 'require approval'}"
+        )
         return
 
     # ── Bootstrap components ───────────────────────────────────────
@@ -307,9 +319,7 @@ def demo_cmd(alert_type: str, database: str | None, dry_run: bool):
     # This clears circuit breaker + repeat alert rule.
     _wf_subquery = "(SELECT id FROM workflows WHERE database_id = ? AND alert_type = ?)"
     _wf_params = (db_cfg.name, alert_type)
-    db.execute_write(
-        f"DELETE FROM audit_log WHERE workflow_id IN {_wf_subquery}", _wf_params
-    )
+    db.execute_write(f"DELETE FROM audit_log WHERE workflow_id IN {_wf_subquery}", _wf_params)
     db.execute_write(
         f"DELETE FROM learning_observations WHERE workflow_id IN {_wf_subquery}",
         _wf_params,
@@ -338,7 +348,9 @@ def demo_cmd(alert_type: str, database: str | None, dry_run: bool):
     try:
         profiles = profiler.profile_all()
         for db_id, p in profiles.items():
-            console.print(f"  [green]Profiled[/green] {db_id}: size={p.db_size_gb:.1f}GB, OMF={p.omf_enabled}")
+            console.print(
+                f"  [green]Profiled[/green] {db_id}: size={p.db_size_gb:.1f}GB, OMF={p.omf_enabled}"
+            )
     except Exception as e:
         console.print(f"  [yellow]Profile warning:[/yellow] {e}")
 
