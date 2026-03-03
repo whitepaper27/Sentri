@@ -18,17 +18,21 @@ Before you begin, make sure you have:
 ## 1. Install
 
 ```bash
+pip install sentri-dba
+```
+
+Or with LLM support (Claude, OpenAI, Gemini):
+
+```bash
+pip install "sentri-dba[llm]"
+```
+
+Or from source:
+
+```bash
 git clone https://github.com/whitepaper27/sentri.git
 cd sentri
 pip install -e ".[dev,llm]"
-```
-
-This installs Sentri with all dependencies. The `llm` extra includes Claude, OpenAI, and Gemini client libraries. The `dev` extra includes testing and linting tools.
-
-If you don't need LLM support:
-
-```bash
-pip install -e .
 ```
 
 ---
