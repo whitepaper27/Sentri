@@ -3,7 +3,7 @@
 > Detects, diagnoses, and fixes Oracle database problems automatically.
 > Drop a `.md` file to add new alert types — zero code changes.
 
-![CI](https://github.com/sahilkhan03/sentri/actions/workflows/ci.yml/badge.svg)
+![CI](https://github.com/whitepaper27/sentri/actions/workflows/ci.yml/badge.svg)
 ![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)
 ![License](https://img.shields.io/badge/license-Apache%202.0-green)
 ![Tests](https://img.shields.io/badge/tests-847%20passed-brightgreen)
@@ -73,7 +73,7 @@ Sentri monitors your DBA alert emails, verifies problems against real database s
 ### 1. Install
 
 ```bash
-git clone https://github.com/sahilkhan03/sentri.git
+git clone https://github.com/whitepaper27/sentri.git
 cd sentri
 pip install -e ".[dev,llm]"
 ```
