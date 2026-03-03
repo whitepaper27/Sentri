@@ -313,17 +313,30 @@ The `<NAME>` pattern: uppercase the database name, replace hyphens with undersco
 
 ---
 
+## Documentation
+
+| Guide | Description |
+|-------|-------------|
+| [Getting Started](docs/getting-started.md) | Install, configure, and start monitoring |
+| [Configuration Reference](docs/configuration.md) | Every `sentri.yaml` field explained |
+| [Adding Alerts & Checks](docs/adding-alerts.md) | Add new alert types by dropping a `.md` file |
+| [Architecture Overview](docs/architecture.md) | How agents, routing, and safety work |
+| [Safety Model](docs/safety-model.md) | How Sentri keeps your databases safe |
+| [FAQ](docs/faq.md) | Common questions and answers |
+
+---
+
 ## Customizing Policies
 
 Sentri's behavior is driven by `.md` policy files that DBAs can edit without writing code.
 
 ### Alert Patterns (`~/.sentri/alerts/`)
 
-Each `.md` file defines: email pattern (regex), verification query (SQL), forward action (fix SQL), rollback action (undo SQL), and validation query (confirm fix). See the [alerts/ directory](alerts/) for examples.
+Each `.md` file defines: email pattern (regex), verification query (SQL), forward action (fix SQL), rollback action (undo SQL), and validation query (confirm fix). See the [alerts/ directory](alerts/) for examples and the [Adding Alerts guide](docs/adding-alerts.md) for a step-by-step walkthrough.
 
 ### Health Checks (`~/.sentri/checks/`)
 
-Same pattern as alerts — drop a `.md` file with a health query, threshold, and recommended action. See the [checks/ directory](checks/) for examples.
+Same pattern as alerts — drop a `.md` file with a health query, threshold, and recommended action. See the [checks/ directory](checks/) for examples and the [Adding Alerts guide](docs/adding-alerts.md#adding-a-proactive-health-check) for details.
 
 ### Brain Policies (`~/.sentri/brain/`)
 
