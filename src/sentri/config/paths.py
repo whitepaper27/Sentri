@@ -21,7 +21,7 @@ def _find_project_root() -> Path:
         if toml.exists():
             try:
                 text = toml.read_text(encoding="utf-8")
-                if 'name = "sentri"' in text:
+                if 'name = "sentri-dba"' in text:
                     return parent
             except Exception:
                 pass

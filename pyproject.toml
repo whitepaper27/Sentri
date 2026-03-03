@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "sentri"
+name = "sentri-dba"
 version = "5.2.0"
 description = "AI-Powered L3 DBA Agent System - Autonomous database issue detection and resolution"
 readme = "README.md"
