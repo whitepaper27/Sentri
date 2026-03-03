@@ -91,9 +91,7 @@ class PagerDutyAdapter(NotificationAdapter):
         return self._send_event(
             action="resolve",
             dedup_key=f"sentri-{ctx.short_id}",
-            summary=(
-                f"[SENTRI] Resolved: {ctx.alert_type} on " f"{ctx.database_id} — {ctx.result}"
-            ),
+            summary=(f"[SENTRI] Resolved: {ctx.alert_type} on {ctx.database_id} — {ctx.result}"),
             severity="info",
             source=ctx.database_id,
         )
@@ -104,7 +102,7 @@ class PagerDutyAdapter(NotificationAdapter):
             action="trigger",
             dedup_key=f"sentri-escalation-{ctx.short_id}",
             summary=(
-                f"[SENTRI] ESCALATED: {ctx.alert_type} on " f"{ctx.database_id} ({ctx.environment})"
+                f"[SENTRI] ESCALATED: {ctx.alert_type} on {ctx.database_id} ({ctx.environment})"
             ),
             severity="critical",
             source=ctx.database_id,

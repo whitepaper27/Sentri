@@ -546,7 +546,7 @@ class DBAToolExecutor:
         sql = f"""
             SELECT name, value, isdefault
             FROM v$parameter
-            WHERE name IN ({', '.join(conditions)})
+            WHERE name IN ({", ".join(conditions)})
         """
 
         rows = self._query(db_id, sql, binds)
@@ -838,7 +838,7 @@ class DBAToolExecutor:
                 SELECT table_owner, table_name, partitioning_type,
                        subpartitioning_type, partition_count
                 FROM dba_part_tables
-                WHERE table_name = :tname {owner_filter.replace('t.owner', 'table_owner')}
+                WHERE table_name = :tname {owner_filter.replace("t.owner", "table_owner")}
             """,
                 params,
             )
@@ -886,7 +886,7 @@ class DBAToolExecutor:
             SELECT ic.index_owner, ic.index_name, ic.column_name,
                    ic.column_position, ic.descend
             FROM dba_ind_columns ic
-            WHERE ic.table_name = :tname {owner_filter.replace('i.table_owner', 'ic.index_owner')}
+            WHERE ic.table_name = :tname {owner_filter.replace("i.table_owner", "ic.index_owner")}
             ORDER BY ic.index_owner, ic.index_name, ic.column_position
         """,
             params,
@@ -1008,8 +1008,7 @@ class DBAToolExecutor:
         # Security: validate metric against allowlist
         if metric not in _VALID_TOP_SQL_METRICS:
             return {
-                "error": f"Invalid metric '{metric}'. "
-                f"Valid: {list(_VALID_TOP_SQL_METRICS.keys())}",
+                "error": f"Invalid metric '{metric}'. Valid: {list(_VALID_TOP_SQL_METRICS.keys())}",
             }
 
         order_column = _VALID_TOP_SQL_METRICS[metric]

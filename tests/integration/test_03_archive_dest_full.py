@@ -3,7 +3,6 @@
 Oracle Free lacks RMAN, so execution is expected to fail gracefully.
 """
 
-
 from tests.integration.conftest import TEST_DB_NAME
 
 

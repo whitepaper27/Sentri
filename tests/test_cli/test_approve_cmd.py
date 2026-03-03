@@ -46,8 +46,9 @@ class TestApproveCmd:
         )
         wf_id = repo.create(wf)
 
-        with patch("sentri.config.paths.SENTRI_HOME", home), patch(
-            "sentri.config.paths.DB_PATH", db_path
+        with (
+            patch("sentri.config.paths.SENTRI_HOME", home),
+            patch("sentri.config.paths.DB_PATH", db_path),
         ):
             result = runner.invoke(approve_cmd, [wf_id])
 
@@ -70,8 +71,9 @@ class TestApproveCmd:
         )
         wf_id = repo.create(wf)
 
-        with patch("sentri.config.paths.SENTRI_HOME", home), patch(
-            "sentri.config.paths.DB_PATH", db_path
+        with (
+            patch("sentri.config.paths.SENTRI_HOME", home),
+            patch("sentri.config.paths.DB_PATH", db_path),
         ):
             result = runner.invoke(approve_cmd, [wf_id, "--deny"])
 
@@ -95,8 +97,9 @@ class TestApproveCmd:
         wf_id = repo.create(wf)
         short_id = wf_id[:8]
 
-        with patch("sentri.config.paths.SENTRI_HOME", home), patch(
-            "sentri.config.paths.DB_PATH", db_path
+        with (
+            patch("sentri.config.paths.SENTRI_HOME", home),
+            patch("sentri.config.paths.DB_PATH", db_path),
         ):
             result = runner.invoke(approve_cmd, [short_id])
 
@@ -116,8 +119,9 @@ class TestApproveCmd:
         )
         wf_id = repo.create(wf)
 
-        with patch("sentri.config.paths.SENTRI_HOME", home), patch(
-            "sentri.config.paths.DB_PATH", db_path
+        with (
+            patch("sentri.config.paths.SENTRI_HOME", home),
+            patch("sentri.config.paths.DB_PATH", db_path),
         ):
             result = runner.invoke(approve_cmd, [wf_id])
 
@@ -127,8 +131,9 @@ class TestApproveCmd:
         """Should error when workflow doesn't exist."""
         db, db_path, home = cli_db
 
-        with patch("sentri.config.paths.SENTRI_HOME", home), patch(
-            "sentri.config.paths.DB_PATH", db_path
+        with (
+            patch("sentri.config.paths.SENTRI_HOME", home),
+            patch("sentri.config.paths.DB_PATH", db_path),
         ):
             result = runner.invoke(approve_cmd, ["nonexistent-id-12345"])
 
@@ -149,8 +154,9 @@ class TestApproveCmd:
         )
         wf_id = repo.create(wf)
 
-        with patch("sentri.config.paths.SENTRI_HOME", home), patch(
-            "sentri.config.paths.DB_PATH", db_path
+        with (
+            patch("sentri.config.paths.SENTRI_HOME", home),
+            patch("sentri.config.paths.DB_PATH", db_path),
         ):
             result = runner.invoke(approve_cmd, [wf_id, "--by", "John DBA"])
 
@@ -182,8 +188,9 @@ class TestApproveCmd:
         )
         wf_id = repo.create(wf)
 
-        with patch("sentri.config.paths.SENTRI_HOME", home), patch(
-            "sentri.config.paths.DB_PATH", db_path
+        with (
+            patch("sentri.config.paths.SENTRI_HOME", home),
+            patch("sentri.config.paths.DB_PATH", db_path),
         ):
             result = runner.invoke(approve_cmd, [wf_id, "--deny", "--reason", "too risky"])
 
@@ -208,8 +215,9 @@ class TestApproveCmd:
         )
         wf_id = repo.create(wf)
 
-        with patch("sentri.config.paths.SENTRI_HOME", home), patch(
-            "sentri.config.paths.DB_PATH", db_path
+        with (
+            patch("sentri.config.paths.SENTRI_HOME", home),
+            patch("sentri.config.paths.DB_PATH", db_path),
         ):
             result = runner.invoke(approve_cmd, [wf_id, "--deny", "--escalate"])
 

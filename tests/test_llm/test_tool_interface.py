@@ -1,6 +1,5 @@
 """Tests for v2.1 tool-calling dataclasses and LLMProvider base class."""
 
-
 from sentri.core.llm_interface import (
     GenerateWithToolsResponse,
     NoOpLLMProvider,

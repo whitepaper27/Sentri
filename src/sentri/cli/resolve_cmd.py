@@ -65,8 +65,7 @@ def resolve_cmd(workflow_id: str, reason: str, resolved_by: str, escalate: bool)
     # Cannot resolve terminal workflows
     if is_terminal(wf.status):
         console.print(
-            f"[yellow]Workflow {wf.id[:8]}... is already in terminal state "
-            f"'{wf.status}'.[/yellow]"
+            f"[yellow]Workflow {wf.id[:8]}... is already in terminal state '{wf.status}'.[/yellow]"
         )
         db.close()
         raise SystemExit(1)

@@ -164,7 +164,7 @@ Or use the CLI:
     <tr><td style="padding: 6px 12px; font-weight: bold;">Alert Type</td>
         <td style="padding: 6px 12px;">{alert_type}</td></tr>
     <tr><td style="padding: 6px 12px; font-weight: bold;">Risk Level</td>
-        <td style="padding: 6px 12px; color: {'#c62828' if risk_level in ('HIGH','CRITICAL') else '#e65100' if risk_level == 'MEDIUM' else '#2e7d32'};">
+        <td style="padding: 6px 12px; color: {"#c62828" if risk_level in ("HIGH", "CRITICAL") else "#e65100" if risk_level == "MEDIUM" else "#2e7d32"};">
           <strong>{risk_level}</strong></td></tr>
     <tr><td style="padding: 6px 12px; font-weight: bold;">Confidence</td>
         <td style="padding: 6px 12px;">{confidence:.0%}</td></tr>

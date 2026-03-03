@@ -1,6 +1,5 @@
 """Integration: Safety Mesh enforcement with real SQLite state."""
 
-
 from sentri.core.models import AuditRecord, ExecutionPlan, Suggestion, Workflow
 from tests.integration.conftest import TEST_DB_NAME
 

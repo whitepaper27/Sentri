@@ -478,9 +478,7 @@ class TestWebSourceFrontmatter:
         doc_dir = tmp_path / "19c" / "tablespace"
         doc_dir.mkdir(parents=True)
         (doc_dir / "alter_tablespace.md").write_text(
-            "---\nversion: 19c\ntopic: tablespace\n"
-            "operation: alter_tablespace\n"
-            "---\n\n# Content",
+            "---\nversion: 19c\ntopic: tablespace\noperation: alter_tablespace\n---\n\n# Content",
             encoding="utf-8",
         )
 

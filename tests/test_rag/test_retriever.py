@@ -1,6 +1,5 @@
 """Tests for the RAG retriever — keyword mapping + doc loading."""
 
-
 from sentri.rag.retriever import (
     ALERT_DOC_MAP,
     KeywordRetriever,
@@ -142,12 +141,11 @@ class TestRuleDocs:
         rules_dir = tmp_path / "rules"
         rules_dir.mkdir()
         (rules_dir / "rule_a.md").write_text(
-            "---\nrule_id: rule_a\nseverity: HIGH\n"
-            "applies_to: [tablespace_full]\n---\n\nContent",
+            "---\nrule_id: rule_a\nseverity: HIGH\napplies_to: [tablespace_full]\n---\n\nContent",
             encoding="utf-8",
         )
         (rules_dir / "rule_b.md").write_text(
-            "---\nrule_id: rule_b\nseverity: MEDIUM\n" "applies_to: [cpu_high]\n---\n\nContent",
+            "---\nrule_id: rule_b\nseverity: MEDIUM\napplies_to: [cpu_high]\n---\n\nContent",
             encoding="utf-8",
         )
 

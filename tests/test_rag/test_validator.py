@@ -1,6 +1,5 @@
 """Tests for the SQL validator — checks LLM SQL against ground truth rules."""
 
-
 from sentri.rag.manager import RuleDoc, RuleViolation, ValidationResult
 from sentri.rag.validator import SQLValidator
 

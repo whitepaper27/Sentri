@@ -1178,8 +1178,9 @@ class TestExecutorConstructor:
 
     def test_default_pool_created(self, agent_context):
         """When no oracle_pool is provided, a default OracleConnectionPool is created."""
-        with patch("sentri.agents.executor.OracleConnectionPool") as MockPool, patch(
-            "sentri.agents.executor.QueryRunner"
+        with (
+            patch("sentri.agents.executor.OracleConnectionPool") as MockPool,
+            patch("sentri.agents.executor.QueryRunner"),
         ):
             _agent = ExecutorAgent(context=agent_context)
             MockPool.assert_called_once()

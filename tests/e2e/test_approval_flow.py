@@ -240,9 +240,9 @@ def cmd_approve_email(short_id: str):
     msg = MIMEText("APPROVED\n\nLooks good, proceed with execution.", "plain")
     msg["From"] = cfg["username"]
     msg["To"] = cfg["username"]
-    msg[
-        "Subject"
-    ] = f"Re: [SENTRI] Approval needed: {wf.alert_type} on {wf.database_id} [WF:{wf_tag}]"
+    msg["Subject"] = (
+        f"Re: [SENTRI] Approval needed: {wf.alert_type} on {wf.database_id} [WF:{wf_tag}]"
+    )
 
     try:
         server = smtplib.SMTP(cfg["smtp_server"], cfg["smtp_port"])

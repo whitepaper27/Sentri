@@ -454,7 +454,7 @@ class WebFetcher:
     FETCH_TIMEOUT = 30
 
     # User-Agent to use for requests (Oracle docs may block default urllib UA)
-    USER_AGENT = "Mozilla/5.0 (compatible; SentriDBA/3.1; " "+https://github.com/sentri-dba/sentri)"
+    USER_AGENT = "Mozilla/5.0 (compatible; SentriDBA/3.1; +https://github.com/sentri-dba/sentri)"
 
     def __init__(self, docs_path: Path, cache_hours: int = 24):
         self._docs_path = docs_path
@@ -526,10 +526,7 @@ class WebFetcher:
 
         # Append web content as a clearly-marked supplement
         enriched_content = (
-            f"{doc.content}\n\n"
-            f"---\n"
-            f"## Additional Reference (docs.oracle.com)\n\n"
-            f"{web_content}"
+            f"{doc.content}\n\n---\n## Additional Reference (docs.oracle.com)\n\n{web_content}"
         )
 
         return SyntaxDoc(

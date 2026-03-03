@@ -72,9 +72,9 @@ class TestConnectionPool:
         mock_cursor.execute.assert_not_called()
         # Specifically, no ALTER SESSION
         for c in mock_cursor.execute.call_args_list:
-            assert "CURRENT_SCHEMA" not in str(
-                c
-            ), "Must NOT set CURRENT_SCHEMA = SYS (breaks V$ synonyms)"
+            assert "CURRENT_SCHEMA" not in str(c), (
+                "Must NOT set CURRENT_SCHEMA = SYS (breaks V$ synonyms)"
+            )
 
     def test_read_write_connection_no_schema(self):
         """Even read_only=False should not set CURRENT_SCHEMA."""

@@ -221,9 +221,9 @@ class TestSpecialistActionTypes:
         ]
         for action in actions:
             v = rules_engine.evaluate(action, "PROD", confidence=0.90)
-            assert (
-                v.verdict == Verdict.REQUIRE_APPROVAL
-            ), f"{action} on PROD should require approval, got {v.verdict}"
+            assert v.verdict == Verdict.REQUIRE_APPROVAL, (
+                f"{action} on PROD should require approval, got {v.verdict}"
+            )
 
 
 # ---------------------------------------------------------------------------

@@ -53,7 +53,7 @@ class ClaudeProvider(LLMProvider):
                 raise
             except ImportError:
                 raise LLMError(
-                    "anthropic package not installed. " "Install with: pip install sentri[llm]"
+                    "anthropic package not installed. Install with: pip install sentri[llm]"
                 )
         return self._client
 
@@ -195,7 +195,7 @@ class OpenAIProvider(LLMProvider):
                 self._client = openai.OpenAI(api_key=self._api_key)
             except ImportError:
                 raise LLMError(
-                    "openai package not installed. " "Install with: pip install sentri[llm]"
+                    "openai package not installed. Install with: pip install sentri[llm]"
                 )
         return self._client
 

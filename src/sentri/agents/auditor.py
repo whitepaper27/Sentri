@@ -149,7 +149,7 @@ class AuditorAgent(BaseAgent):
 
         # Log detailed verdict
         self.logger.info(
-            "[%s] Verification verdict: valid=%s, confidence=%.2f, " "passed=[%s], failed=[%s]",
+            "[%s] Verification verdict: valid=%s, confidence=%.2f, passed=[%s], failed=[%s]",
             workflow.id[:8],
             is_valid,
             confidence,
@@ -264,8 +264,7 @@ class AuditorAgent(BaseAgent):
                 return False
 
             self.logger.info(
-                "Metrics OK on '%s': reported=%.2f, actual=%.2f, "
-                "diff=%.2f within tolerance=%.2f",
+                "Metrics OK on '%s': reported=%.2f, actual=%.2f, diff=%.2f within tolerance=%.2f",
                 key,
                 reported_val,
                 actual_val,

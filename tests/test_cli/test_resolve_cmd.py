@@ -46,8 +46,9 @@ class TestResolveCmd:
         )
         wf_id = repo.create(wf)
 
-        with patch("sentri.config.paths.SENTRI_HOME", home), patch(
-            "sentri.config.paths.DB_PATH", db_path
+        with (
+            patch("sentri.config.paths.SENTRI_HOME", home),
+            patch("sentri.config.paths.DB_PATH", db_path),
         ):
             result = runner.invoke(resolve_cmd, [wf_id, "--reason", "Fixed manually"])
 
@@ -71,8 +72,9 @@ class TestResolveCmd:
         )
         wf_id = repo.create(wf)
 
-        with patch("sentri.config.paths.SENTRI_HOME", home), patch(
-            "sentri.config.paths.DB_PATH", db_path
+        with (
+            patch("sentri.config.paths.SENTRI_HOME", home),
+            patch("sentri.config.paths.DB_PATH", db_path),
         ):
             result = runner.invoke(resolve_cmd, [wf_id])
 
@@ -94,8 +96,9 @@ class TestResolveCmd:
         )
         wf_id = repo.create(wf)
 
-        with patch("sentri.config.paths.SENTRI_HOME", home), patch(
-            "sentri.config.paths.DB_PATH", db_path
+        with (
+            patch("sentri.config.paths.SENTRI_HOME", home),
+            patch("sentri.config.paths.DB_PATH", db_path),
         ):
             result = runner.invoke(resolve_cmd, [wf_id, "--escalate"])
 
@@ -119,8 +122,9 @@ class TestResolveCmd:
         )
         wf_id = repo.create(wf)
 
-        with patch("sentri.config.paths.SENTRI_HOME", home), patch(
-            "sentri.config.paths.DB_PATH", db_path
+        with (
+            patch("sentri.config.paths.SENTRI_HOME", home),
+            patch("sentri.config.paths.DB_PATH", db_path),
         ):
             result = runner.invoke(
                 resolve_cmd,
@@ -154,8 +158,9 @@ class TestResolveCmd:
         )
         wf_id = repo.create(wf)
 
-        with patch("sentri.config.paths.SENTRI_HOME", home), patch(
-            "sentri.config.paths.DB_PATH", db_path
+        with (
+            patch("sentri.config.paths.SENTRI_HOME", home),
+            patch("sentri.config.paths.DB_PATH", db_path),
         ):
             result = runner.invoke(resolve_cmd, [wf_id])
 
@@ -165,8 +170,9 @@ class TestResolveCmd:
         """Should error when workflow doesn't exist."""
         db, db_path, home = cli_db
 
-        with patch("sentri.config.paths.SENTRI_HOME", home), patch(
-            "sentri.config.paths.DB_PATH", db_path
+        with (
+            patch("sentri.config.paths.SENTRI_HOME", home),
+            patch("sentri.config.paths.DB_PATH", db_path),
         ):
             result = runner.invoke(resolve_cmd, ["nonexistent-id-12345"])
 
@@ -186,8 +192,9 @@ class TestResolveCmd:
         wf_id = repo.create(wf)
         short_id = wf_id[:8]
 
-        with patch("sentri.config.paths.SENTRI_HOME", home), patch(
-            "sentri.config.paths.DB_PATH", db_path
+        with (
+            patch("sentri.config.paths.SENTRI_HOME", home),
+            patch("sentri.config.paths.DB_PATH", db_path),
         ):
             result = runner.invoke(resolve_cmd, [short_id])
 

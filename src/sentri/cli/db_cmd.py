@@ -87,8 +87,7 @@ def db_test(name: str | None):
         name_key = db.name.upper().replace("-", "_")
         if not db.password:
             console.print(
-                f"  [yellow]{db.name}[/yellow]: No password set "
-                f"(set SENTRI_DB_{name_key}_PASSWORD)"
+                f"  [yellow]{db.name}[/yellow]: No password set (set SENTRI_DB_{name_key}_PASSWORD)"
             )
             continue
 

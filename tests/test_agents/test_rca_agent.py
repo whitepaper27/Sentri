@@ -169,9 +169,10 @@ class TestTier2:
         """If T1 is conclusive, T2 doesn't run."""
         wf = _create_workflow(agent_context.workflow_repo)
         # Mock T1 to be conclusive
-        with patch.object(rca_agent, "_investigate_tier1") as mock_t1, patch.object(
-            rca_agent, "_investigate_tier2"
-        ) as mock_t2:
+        with (
+            patch.object(rca_agent, "_investigate_tier1") as mock_t1,
+            patch.object(rca_agent, "_investigate_tier2") as mock_t2,
+        ):
             mock_t1.return_value = {"conclusive": True, "wait_classes": []}
             rca_agent.investigate(wf)
             mock_t2.assert_not_called()

@@ -69,7 +69,7 @@ def main():
     """,
     )
     print(f"   {'Tablespace':<25} {'Status':<10} {'Type':<12} {'Used %':>8}")
-    print(f"   {'-'*60}")
+    print(f"   {'-' * 60}")
     for r in rows:
         pct = r.get("used_pct", 0) or 0
         color = RED if pct > 90 else YELLOW if pct > 75 else GREEN

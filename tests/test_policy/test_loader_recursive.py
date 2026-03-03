@@ -233,9 +233,9 @@ class TestBundledPoliciesIntegration:
             "high_undo_usage",
             "long_running_sql",
         }
-        assert expected.issubset(
-            set(alerts.keys())
-        ), f"Missing alerts: {expected - set(alerts.keys())}"
+        assert expected.issubset(set(alerts.keys())), (
+            f"Missing alerts: {expected - set(alerts.keys())}"
+        )
 
     def test_bundled_alerts_exclude_readme(self, bundled_loader):
         """README.md files in alerts/ and subdirectories are excluded."""

@@ -632,7 +632,7 @@ class TestNotificationRouterFromYaml:
         config = tmp_path / "config" / "sentri.yaml"
         config.parent.mkdir(parents=True)
         config.write_text(
-            "databases:\n" "  - name: dev\n" "    environment: DEV\n",
+            "databases:\n  - name: dev\n    environment: DEV\n",
             encoding="utf-8",
         )
 

@@ -182,8 +182,9 @@ class TestDBAToolExecutor:
             },
         )
         mock_conn = MagicMock()
-        with patch.object(executor, "_get_connection", return_value=mock_conn), patch.object(
-            executor, "_query", return_value=[{"name": "ORCL"}]
+        with (
+            patch.object(executor, "_get_connection", return_value=mock_conn),
+            patch.object(executor, "_query", return_value=[{"name": "ORCL"}]),
         ):
             result = executor.execute(tc)
 
@@ -200,8 +201,9 @@ class TestDBAToolExecutor:
                 "sql": "WITH cte AS (SELECT 1 x FROM dual) SELECT x FROM cte",
             },
         )
-        with patch.object(executor, "_get_connection", return_value=MagicMock()), patch.object(
-            executor, "_query", return_value=[{"x": 1}]
+        with (
+            patch.object(executor, "_get_connection", return_value=MagicMock()),
+            patch.object(executor, "_query", return_value=[{"x": 1}]),
         ):
             result = executor.execute(tc)
         assert result.is_error is False

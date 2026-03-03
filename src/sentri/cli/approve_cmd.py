@@ -64,8 +64,7 @@ def approve_cmd(workflow_id: str, deny: bool, approved_by: str, reason: str, esc
 
     if wf.status != WorkflowStatus.AWAITING_APPROVAL.value:
         console.print(
-            f"[yellow]Workflow {wf.id} is in status '{wf.status}', "
-            f"not AWAITING_APPROVAL.[/yellow]"
+            f"[yellow]Workflow {wf.id} is in status '{wf.status}', not AWAITING_APPROVAL.[/yellow]"
         )
         db.close()
         raise SystemExit(1)
