@@ -1,6 +1,7 @@
 """Path resolution for the Sentri runtime directory.
 
-By default, SENTRI_HOME is the project root (where pyproject.toml lives).
+Dev mode: SENTRI_HOME is the project root (where sentri's pyproject.toml lives).
+Installed mode (pip install): SENTRI_HOME is ~/.sentri/.
 Override with SENTRI_HOME environment variable if needed.
 """
 
@@ -9,13 +10,23 @@ from pathlib import Path
 
 
 def _find_project_root() -> Path:
-    """Find the project root by looking for pyproject.toml upward from this file."""
+    """Find the project root (dev mode) or default to ~/.sentri/ (installed mode).
+
+    Dev mode: walks up from this file looking for sentri's pyproject.toml.
+    Installed mode (pip install): falls back to ~/.sentri/.
+    """
     current = Path(__file__).resolve().parent
     for parent in [current] + list(current.parents):
-        if (parent / "pyproject.toml").exists():
-            return parent
-    # Fallback: current working directory
-    return Path.cwd()
+        toml = parent / "pyproject.toml"
+        if toml.exists():
+            try:
+                text = toml.read_text(encoding="utf-8")
+                if 'name = "sentri"' in text:
+                    return parent
+            except Exception:
+                pass
+    # Installed via pip — use ~/.sentri/
+    return Path.home() / ".sentri"
 
 
 # Base directory: project root (or SENTRI_HOME env var override)
