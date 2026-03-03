@@ -9,6 +9,10 @@
 ![License](https://img.shields.io/badge/license-Apache%202.0-green)
 ![Tests](https://img.shields.io/badge/tests-847%20passed-brightgreen)
 
+<p align="center">
+  <img src="docs/demo.gif" alt="Sentri Demo" width="720">
+</p>
+
 ---
 
 ## What Sentri Does
