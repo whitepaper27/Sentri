@@ -110,6 +110,48 @@ On Windows, run `sentri start` or use [NSSM](https://nssm.cc/) for background se
 
 ---
 
+### If I change, add, or delete `.md` files, what exactly changes?
+
+Great question — this is the core operator model in Sentri.
+
+- `~/.sentri/alerts/*.md` controls **email detection + extracted fields + verify/fix/rollback/validation** for that alert type.
+- `~/.sentri/checks/*.md` controls **proactive health checks** (schedule, query, threshold, recommended action).
+- `~/.sentri/brain/*.md` controls **routing and policy behavior**.
+- `~/.sentri/docs/oracle/**/*.md` controls **ground-truth context for LLM generation and SQL validation matching**.
+
+Operational behavior:
+- **Edit file** → future detections/decisions use the new content.
+- **Add file** → new capability is available (new alert/check/rule scope).
+- **Delete file** → that future capability is disabled.
+- Existing workflow and audit history remains intact in SQLite.
+
+For production safety, apply file changes first in DEV, run a test alert, inspect `sentri show` + `sentri audit`, then promote.
+
+
+### As an L3 DBA manager, how do I know exactly what happens when alerts are added/removed?
+
+Treat `~/.sentri/alerts/*.md` as your alert-control plane:
+
+- **Add file** (example: `rac_vip_down.md`) → new alert type is detected on next poll cycle.
+- **Edit file** (example: raise risk from MEDIUM to HIGH) → same alert still detected, but execution routing/approval becomes stricter for future workflows.
+- **Delete file** (example: remove `high_cell_iops.md`) → that alert pattern stops creating new workflows.
+
+For transparency:
+
+1. Detection logic is visible in the alert file (`Email Pattern`, `Extracted Fields`).
+2. Action logic is visible in the same file (`Verification`, `Forward Action`, `Rollback`, `Validation`).
+3. Approval behavior is deterministic from `Risk Level` + environment policy in `sentri.yaml`.
+4. Final gate is Safety Mesh; unsafe SQL is blocked regardless of file content.
+5. All decisions are audit-trailed (`sentri list`, `sentri show`, `sentri audit`).
+
+Recommended governance for RAC/Exadata alerts:
+- Keep infra-impact alerts like **RAC VIP down** and **Exadata cell down** as HIGH risk with approval required in PROD.
+- For removed alerts, require CAB sign-off and confirm a replacement signal exists (another alert/check/dashboard), so coverage is not lost.
+
+For a manager-ready runbook format (impact matrix, approval logic, and RAC/Exadata examples), see the [L3 DBA Alert Control Playbook](l3-dba-alert-control-playbook.md).
+
+For DBA teams new to AI concepts, see the [L2/L3 DBA Adoption Guide](l2-l3-dba-adoption-guide.md) for plain-language onboarding and copy-paste templates.
+
 ### How do I add support for a new alert type?
 
 Drop a `.md` file in `~/.sentri/alerts/`. No code changes, no restart needed.

@@ -105,6 +105,39 @@ Handles correlated alerts (multiple alerts on the same database in a short windo
 
 Fixes are applied in theory-ranked order. After each fix, the RCA Agent re-verifies. If the root issue is resolved, it stops.
 
+
+### SQL Tuning Agent — Strengths and Pitfalls (L3 DBA View)
+
+**Strengths**
+- Strong for repeatable tuning hygiene: stale stats, obvious plan regressions, missing-index candidates, and wait-profile driven triage.
+- Candidate scoring (argue/select) reduces single-shot bad fixes by comparing options before execution.
+- Safety Mesh + rollback requirements reduce blast radius of tuning actions.
+
+**Pitfalls / Watch-outs**
+- Not a replacement for deep application SQL redesign; it can optimize around symptoms but cannot fully re-architect workload patterns.
+- Complex bind peeking / adaptive plan edge cases may still require manual DBA investigation.
+- If historical success is high, the cost gate may favor template/one-shot paths; review periodically to ensure drift is not hidden.
+
+### RCA Agent — Strengths and Pitfalls (L3 DBA View)
+
+**Strengths**
+- Good incident commander behavior for correlated alerts across a short window.
+- Tiered triage model helps keep normal incidents fast while preserving a path to deeper analysis.
+- Stops early when re-verification shows the root issue is resolved, reducing unnecessary extra actions.
+
+**Pitfalls / Watch-outs**
+- Correlation windows can be too narrow or too broad for your environment; tune rules to avoid false grouping.
+- Tier escalation criteria need calibration per estate (OLTP vs batch-heavy systems).
+- On RAC/Data Guard-heavy estates, human DBA review remains critical for cross-instance/root-cause validation.
+
+### L3 DBA Daily Tasks Using Sentri
+
+1. Check `sentri stats` for error spikes and success-rate drift.
+2. Review `sentri list --status AWAITING_APPROVAL` and clear approval queue.
+3. Sample `sentri audit --last 50` for policy misses or repeated rollback patterns.
+4. Review top recurring alert types weekly and tune the corresponding `.md` alert/check files.
+5. Validate that PROD autonomy and approval recipients still match current on-call rota.
+
 ### Proactive Agent
 
 Runs scheduled health checks defined in `checks/*.md`. Instead of waiting for alert emails, it proactively queries databases on a schedule (every 6 hours, daily, or weekly) looking for emerging problems. Findings enter the Supervisor exactly like email alerts — same workflow, same state machine, same safety. Ships with 7 built-in checks: stale statistics, tablespace trends, index usage, redo log sizing, temp growth, password expiry, and backup freshness.

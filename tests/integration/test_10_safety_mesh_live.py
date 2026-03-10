@@ -46,7 +46,7 @@ class TestSafetyMeshLive:
         plan = _make_plan()
 
         verdict = int_safety_mesh.check(wf, plan, confidence=0.95)
-        assert verdict.decision.value in ("allow", "require_approval")
+        assert verdict.decision.value in ("ALLOW", "REQUIRE_APPROVAL")
 
     def test_circuit_breaker_blocks_after_failures(self, int_context, int_safety_mesh):
         """3 FAILED audit records on same DB → circuit breaker → BLOCK."""
@@ -67,7 +67,7 @@ class TestSafetyMeshLive:
 
         plan = _make_plan()
         verdict = int_safety_mesh.check(wf, plan, confidence=0.95)
-        assert verdict.decision.value == "block"
+        assert verdict.decision.value == "BLOCK"
 
     def test_conflict_detection_queues(self, int_context, int_safety_mesh):
         """Workflow EXECUTING on same DB → new workflow gets QUEUE."""
@@ -79,7 +79,7 @@ class TestSafetyMeshLive:
         plan = _make_plan()
 
         verdict = int_safety_mesh.check(new_wf, plan, confidence=0.95)
-        assert verdict.decision.value == "queue"
+        assert verdict.decision.value == "QUEUE"
 
     def test_blast_radius_ddl_classification(self, int_context, int_safety_mesh):
         """DDL is correctly classified in blast radius check."""
@@ -88,7 +88,7 @@ class TestSafetyMeshLive:
 
         verdict = int_safety_mesh.check(wf, plan, confidence=0.95)
         # DDL in DEV should be ALLOW (not blocked)
-        assert verdict.decision.value in ("allow", "require_approval")
+        assert verdict.decision.value in ("ALLOW", "REQUIRE_APPROVAL")
 
     def test_no_rollback_high_risk_blocks(self, int_context, int_safety_mesh):
         """HIGH risk with no rollback SQL → BLOCK."""
@@ -105,4 +105,4 @@ class TestSafetyMeshLive:
 
         verdict = int_safety_mesh.check(wf, plan, confidence=0.95)
         # HIGH risk + no rollback → should block
-        assert verdict.decision.value in ("block", "require_approval")
+        assert verdict.decision.value in ("BLOCK", "REQUIRE_APPROVAL")

@@ -218,6 +218,56 @@ sentri audit
 
 ---
 
+
+## File-Driven Behavior (What Happens If You Edit `.md` Files?)
+
+Sentri is intentionally file-driven. As a DBA, you can control behavior without changing Python code.
+
+| If you... | File Location | What happens at runtime |
+|-----------|---------------|-------------------------|
+| Edit an existing alert | `~/.sentri/alerts/*.md` | Scout uses the new regex/extraction on the next poll cycle; verification/fix/rollback/validation logic for that alert type also changes for newly detected workflows |
+| Add a new alert file | `~/.sentri/alerts/*.md` | A new alert type becomes detectable automatically (no restart required) |
+| Delete an alert file | `~/.sentri/alerts/*.md` | New emails for that pattern are no longer detected; existing workflows remain in DB/audit history |
+| Edit/add a proactive check | `~/.sentri/checks/*.md` | Proactive Agent loads new check definitions on schedule and creates findings using the updated SQL/thresholds |
+| Edit routing/policy brain docs | `~/.sentri/brain/*.md` | Routing and policy decisions follow the updated rules on subsequent workflow evaluations |
+| Edit Oracle ground-truth docs | `~/.sentri/docs/oracle/**/*.md` | Researcher prompt context + SQL validation rule matching changes for future candidate generation/validation |
+
+### Important Scope Notes
+
+- Changes apply to **new detections and future decision points**; they do not rewrite already-completed audit history.
+- For in-flight workflows, behavior depends on when each stage reads policy content (detection vs routing vs execution).
+- Deleting a file disables that behavior for future runs; it does not delete historical records from SQLite.
+
+### Safe DBA Change Workflow
+
+1. Clone/backup the `.md` file before editing.
+2. Make one change at a time (regex, SQL, or threshold).
+3. Run a test email or proactive cycle in DEV.
+4. Review `sentri show <workflow_id>` and `sentri audit`.
+5. Promote the same `.md` change to UAT/PROD repo/config.
+
+### Manager-Friendly Change Impact Examples (L3 DBA View)
+
+Use this as a quick "what happens if we change this file" checklist during CAB/review calls.
+
+| Change by DBA | File action | Immediate runtime effect | Approval behavior | Recommended L3 action |
+|---|---|---|---|---|
+| Add `rac_vip_down.md` alert | New file in `~/.sentri/alerts/` | Sentri starts detecting RAC VIP-down emails on next poll; workflows route to RCA/infra path you define in the file | In PROD, fix execution still requires approval before any SQL/action runs | Start in DEV RAC first, simulate one alert, verify extracted `database_id`/node/VIP, then promote |
+| Add `exadata_cell_down.md` alert | New file in `~/.sentri/alerts/` | Exadata cell-down incidents become first-class workflows with your verify/escalate/runbook steps | Keep `Risk Level` HIGH so PROD always needs approval/human gate | Prefer escalation/runbook actions over autonomous SQL for storage-cell outages |
+| Remove `high_cell_iops.md` | Delete file from `~/.sentri/alerts/` | New emails for high cell IOPS are no longer matched by Sentri | No approval generated because no workflow is created for that pattern | Remove only after manager sign-off; keep a replacement check/alert to avoid blind spots |
+| Tighten approval on existing alert | Edit `Risk Level` and/or environment autonomy in config | Same alert still detected, but execution path becomes more restrictive | HIGH risk and PROD always require approval; UAT behavior depends on risk/autonomy settings | Use for change-freeze windows and quarter-close periods |
+
+### Transparent Rules for Approvals
+
+For managers, the approval model is deterministic and auditable:
+
+- **Alert `.md` defines technical risk** via `Risk Level` and rollback/validation sections.
+- **`sentri.yaml` defines environment autonomy** (`DEV`/`UAT`/`PROD`, optional `autonomy_level`).
+- **Safety Mesh is final gate** and can still block unsafe SQL even if an alert file is permissive.
+- **Every decision is logged** in `sentri audit`, including approval requests, approvals/denials, and final outcome.
+
+If you need a strict operating mode for PROD, set policy to require approval for all actions and use alert `.md` files mainly for detection + evidence gathering.
+
 ## Running as a Service
 
 ### Linux (systemd)
@@ -243,3 +293,5 @@ Run `sentri start` or use [NSSM](https://nssm.cc/) for background service manage
 - [Architecture Overview](architecture.md) — how the agents, routing, and safety work
 - [Safety Model](safety-model.md) — how Sentri keeps your databases safe
 - [FAQ](faq.md) — common questions
+- [L3 DBA Alert Control Playbook](l3-dba-alert-control-playbook.md) — manager/operator guide for add/edit/delete alert behavior
+- [L2/L3 DBA Adoption Guide](l2-l3-dba-adoption-guide.md) — no-AI-background guide to create and operate alert `.md` files
