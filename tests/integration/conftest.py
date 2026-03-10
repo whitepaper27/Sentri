@@ -59,6 +59,9 @@ TEST_DB_ENV = "DEV"
 @pytest.fixture(scope="session")
 def oracle_conn():
     """Raw oracledb connection for running verification queries."""
+    if not _oracle_available():
+        pytest.skip("Docker Oracle not available on localhost:1521")
+
     import oracledb
 
     conn = oracledb.connect(user=ORACLE_USER, password=ORACLE_PASSWORD, dsn=ORACLE_DSN)
