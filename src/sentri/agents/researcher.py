@@ -30,6 +30,25 @@ _MAX_TOOL_CALLS = 5
 # Max loop iterations (tool calls + final response)
 _MAX_ITERATIONS = 6
 
+import re as _re
+
+# Strip control chars and cap length for untrusted data in prompts.
+_CONTROL_CHARS_RE = _re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f]")
+
+
+def _sanitize_for_prompt(text: str, max_len: int = 500) -> str:
+    """Sanitize untrusted text before embedding in an LLM prompt.
+
+    - Strips control characters (keeps \\n, \\r, \\t)
+    - Caps length to *max_len*
+    """
+    if not text:
+        return ""
+    text = _CONTROL_CHARS_RE.sub("", str(text))
+    if len(text) > max_len:
+        text = text[:max_len] + "…"
+    return text
+
 
 class ResearcherAgent(BaseAgent):
     """Generates remediation options: agentic, one-shot, or template-based."""
@@ -89,6 +108,8 @@ class ResearcherAgent(BaseAgent):
                     self.logger.info(
                         "Agentic research: %d options for %s", len(options), workflow_id
                     )
+            except (KeyboardInterrupt, SystemExit, MemoryError):
+                raise
             except Exception as e:
                 self.logger.warning("Agentic research failed for %s: %s", workflow_id, e)
                 options = []
@@ -104,6 +125,8 @@ class ResearcherAgent(BaseAgent):
                             len(options),
                             workflow_id,
                         )
+                except (KeyboardInterrupt, SystemExit, MemoryError):
+                    raise
                 except Exception as e:
                     self.logger.warning("One-shot research failed for %s: %s", workflow_id, e)
                     options = []
@@ -128,6 +151,8 @@ class ResearcherAgent(BaseAgent):
         # Store research results on the workflow
         research_data = {
             "source": source,
+            "llm_provider": str(self._llm.name),
+            "llm_model": str(getattr(self._llm, "model_id", "")),
             "option_count": len(options),
             "options": [json.loads(o.to_json()) for o in options],
             "selected_option_id": selected.option_id,
@@ -306,7 +331,8 @@ class ResearcherAgent(BaseAgent):
             prompt=prompt,
             system_prompt=RESEARCHER_SYSTEM_PROMPT,
             temperature=0.3,
-            max_tokens=2048,
+            max_tokens=3072,
+            json_mode=True,
         )
 
         self._track_cost(len(prompt), len(raw_response))
@@ -374,49 +400,15 @@ class ResearcherAgent(BaseAgent):
 
     def _parse_llm_response(self, raw: str, wf: Workflow) -> list[ResearchOption]:
         """Parse the LLM JSON response into ResearchOption objects."""
-        if not raw or not raw.strip():
-            return []
+        from sentri.llm.json_utils import extract_json_from_text
 
-        text = raw.strip()
-
-        # Strip markdown code fences if present
-        if "```" in text:
-            import re as _re
-
-            # Extract content between ```json ... ``` or ``` ... ```
-            fence_match = _re.search(r"```(?:json)?\s*\n(.*?)```", text, _re.DOTALL)
-            if fence_match:
-                text = fence_match.group(1).strip()
-
-        # Try direct parse first
-        data = None
-        try:
-            data = json.loads(text)
-        except json.JSONDecodeError:
-            pass
-
-        # If direct parse failed, extract JSON array from mixed text
-        if data is None:
-            # Find the first [ ... ] block in the text
-            bracket_start = text.find("[")
-            if bracket_start >= 0:
-                # Find matching closing bracket
-                depth = 0
-                for i in range(bracket_start, len(text)):
-                    if text[i] == "[":
-                        depth += 1
-                    elif text[i] == "]":
-                        depth -= 1
-                    if depth == 0:
-                        try:
-                            data = json.loads(text[bracket_start : i + 1])
-                        except json.JSONDecodeError:
-                            pass
-                        break
+        data = extract_json_from_text(raw)
 
         if data is None:
-            self.logger.warning("Failed to parse LLM response as JSON")
-            self.logger.debug("Raw response: %s", raw[:500])
+            self.logger.warning(
+                "Failed to parse LLM response as JSON. Raw (first 500 chars): %s",
+                (raw or "")[:500],
+            )
             return []
 
         if not isinstance(data, list):
@@ -478,7 +470,7 @@ class ResearcherAgent(BaseAgent):
             ]
             extracted = suggestion.get("extracted_data", {})
             for k, v in extracted.items():
-                parts.append(f"{k}: {v}")
+                parts.append(f"{k}: {_sanitize_for_prompt(str(v))}")
             return "\n".join(parts)
         except (json.JSONDecodeError, AttributeError):
             return f"Alert type: {wf.alert_type}, Database: {wf.database_id}"

@@ -74,6 +74,7 @@ class LLMProvider(ABC):
         system_prompt: str = "",
         temperature: float = 0.3,
         max_tokens: int = 2048,
+        json_mode: bool = False,
     ) -> str:
         """Generate a text completion.
 
@@ -82,6 +83,10 @@ class LLMProvider(ABC):
             system_prompt: Optional system-level instructions.
             temperature: Sampling temperature (0.0 = deterministic).
             max_tokens: Maximum tokens in the response.
+            json_mode: When True, enforce structured JSON output if the
+                provider supports it (OpenAI response_format, Gemini
+                response_mime_type). Providers without native JSON mode
+                ignore this flag.
 
         Returns:
             The generated text.
@@ -161,6 +166,11 @@ class LLMProvider(ABC):
     def name(self) -> str:
         """Human-readable provider name (e.g. 'Claude', 'OpenAI')."""
 
+    @property
+    def model_id(self) -> str:
+        """Exact model identifier used for API calls (e.g. 'gemini-2.0-flash-001')."""
+        return ""
+
 
 class NoOpLLMProvider(LLMProvider):
     """Stub provider used when no API key is configured.
@@ -175,6 +185,7 @@ class NoOpLLMProvider(LLMProvider):
         system_prompt: str = "",
         temperature: float = 0.3,
         max_tokens: int = 2048,
+        json_mode: bool = False,
     ) -> str:
         logger.debug("NoOpLLMProvider.generate() called — returning empty string")
         return ""
@@ -185,3 +196,7 @@ class NoOpLLMProvider(LLMProvider):
     @property
     def name(self) -> str:
         return "NoOp"
+
+    @property
+    def model_id(self) -> str:
+        return "noop"

@@ -332,3 +332,241 @@ To escalate further:
             short_id,
         )
     return ok
+
+
+def send_completion_email(
+    smtp_server: str,
+    smtp_port: int,
+    from_addr: str,
+    to_addrs: list[str],
+    workflow_id: str,
+    database_id: str,
+    alert_type: str,
+    environment: str,
+    result: str,
+    forward_sql: str = "",
+    rollback_sql: str = "",
+    confidence: float = 0.0,
+    reasons: list[str] | None = None,
+    username: str = "",
+    password: str = "",
+    use_tls: bool = True,
+) -> bool:
+    """Send a completion notification email showing what action was taken.
+
+    Returns True on success, False on failure.
+    """
+    if not smtp_server or not to_addrs:
+        logger.debug("Email not configured, skipping completion notice")
+        return False
+
+    short_id = workflow_id[:8]
+    is_success = result.upper() in ("SUCCESS", "COMPLETED")
+    status_label = "COMPLETED" if is_success else result.upper()
+    status_color = "#2e7d32" if is_success else "#c62828"
+    banner_bg = "#2e7d32" if is_success else "#b71c1c"
+
+    subject = (
+        f"[SENTRI] {status_label}: {alert_type} on {database_id} [WF:{short_id}]"
+    )
+
+    text_body = f"""SENTRI Fix {status_label}
+{"=" * 30}
+
+Workflow:    {workflow_id}
+Database:    {database_id}
+Environment: {environment}
+Alert Type:  {alert_type}
+Confidence:  {confidence:.0%}
+Result:      {status_label}
+
+Fix Applied:
+{forward_sql or "(none)"}
+
+Rollback SQL:
+{rollback_sql or "(none)"}
+{"" if not reasons else chr(10) + "Recommendations:" + chr(10) + chr(10).join("  - " + r for r in reasons) + chr(10)}
+---
+View details: sentri show {short_id}
+"""
+
+    html_body = f"""\
+<html>
+<body style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto;">
+<div style="background: {banner_bg}; color: white; padding: 16px 24px; border-radius: 8px 8px 0 0;">
+  <h2 style="margin: 0;">SENTRI Fix {status_label}</h2>
+</div>
+<div style="border: 1px solid #ddd; border-top: none; padding: 24px; border-radius: 0 0 8px 8px;">
+  <table style="width: 100%; border-collapse: collapse; margin-bottom: 16px;">
+    <tr><td style="padding: 6px 12px; font-weight: bold; width: 130px;">Workflow</td>
+        <td style="padding: 6px 12px;"><code>{workflow_id}</code></td></tr>
+    <tr><td style="padding: 6px 12px; font-weight: bold;">Database</td>
+        <td style="padding: 6px 12px;">{database_id}</td></tr>
+    <tr><td style="padding: 6px 12px; font-weight: bold;">Environment</td>
+        <td style="padding: 6px 12px;">{environment}</td></tr>
+    <tr><td style="padding: 6px 12px; font-weight: bold;">Alert Type</td>
+        <td style="padding: 6px 12px;">{alert_type}</td></tr>
+    <tr><td style="padding: 6px 12px; font-weight: bold;">Confidence</td>
+        <td style="padding: 6px 12px;">{confidence:.0%}</td></tr>
+    <tr><td style="padding: 6px 12px; font-weight: bold;">Result</td>
+        <td style="padding: 6px 12px; color: {status_color};">
+          <strong>{status_label}</strong></td></tr>
+  </table>
+
+  <h3 style="margin-top: 20px;">Fix Applied</h3>
+  <pre style="background: #f5f5f5; padding: 12px; border-radius: 4px; overflow-x: auto;">\
+{forward_sql or "(no SQL executed)"}</pre>
+
+  <h3>Rollback SQL</h3>
+  <pre style="background: #f5f5f5; padding: 12px; border-radius: 4px; overflow-x: auto;">\
+{rollback_sql or "(none)"}</pre>
+{"" if not reasons else '''
+  <div style="background: #fff3e0; border-left: 4px solid #e65100; padding: 12px 16px; margin: 20px 0; border-radius: 4px;">
+    <h3 style="margin: 0 0 8px 0; color: #e65100;">Recommendations</h3>
+    <ul style="margin: 0; padding-left: 20px;">''' + "".join(f"<li>{r}</li>" for r in reasons) + '''</ul>
+  </div>
+'''}
+  <hr style="margin: 24px 0; border: none; border-top: 1px solid #ddd;">
+
+  <p style="color: #666; font-size: 13px;">
+    View full details: <code>sentri show {short_id}</code>
+  </p>
+</div>
+</body>
+</html>"""
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"] = from_addr
+    msg["To"] = ", ".join(to_addrs)
+
+    msg.attach(MIMEText(text_body, "plain"))
+    msg.attach(MIMEText(html_body, "html"))
+
+    ok = _send_smtp(
+        smtp_server,
+        smtp_port,
+        from_addr,
+        to_addrs,
+        msg,
+        username,
+        password,
+        use_tls,
+    )
+    if ok:
+        logger.info(
+            "Completion email sent to %s for workflow %s [WF:%s]",
+            ", ".join(to_addrs),
+            workflow_id,
+            short_id,
+        )
+    return ok
+
+
+def send_escalation_email(
+    smtp_server: str,
+    smtp_port: int,
+    from_addr: str,
+    to_addrs: list[str],
+    workflow_id: str,
+    database_id: str,
+    alert_type: str,
+    environment: str,
+    reasons: list[str] | None = None,
+    username: str = "",
+    password: str = "",
+    use_tls: bool = True,
+) -> bool:
+    """Send an escalation notification email.
+
+    Returns True on success, False on failure.
+    """
+    if not smtp_server or not to_addrs:
+        logger.debug("Email not configured, skipping escalation notice")
+        return False
+
+    short_id = workflow_id[:8]
+    subject = (
+        f"[SENTRI] Escalated: {alert_type} on {database_id} [WF:{short_id}]"
+    )
+
+    reasons_text = "\n".join(f"  - {r}" for r in reasons) if reasons else "  (none)"
+    text_body = f"""SENTRI ESCALATION
+{"=" * 30}
+
+Workflow:    {workflow_id}
+Database:    {database_id}
+Environment: {environment}
+Alert Type:  {alert_type}
+
+This workflow has been ESCALATED and requires manual attention.
+
+Reasons:
+{reasons_text}
+
+---
+To resolve manually:
+  sentri resolve {short_id} --reason "Fixed manually"
+"""
+
+    reasons_html = "".join(f"<li>{r}</li>" for r in reasons) if reasons else "<li>(none)</li>"
+    html_body = f"""\
+<html>
+<body style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto;">
+<div style="background: #b71c1c; color: white; padding: 16px 24px; border-radius: 8px 8px 0 0;">
+  <h2 style="margin: 0;">SENTRI Escalation</h2>
+</div>
+<div style="border: 1px solid #ddd; border-top: none; padding: 24px; border-radius: 0 0 8px 8px;">
+  <table style="width: 100%; border-collapse: collapse; margin-bottom: 16px;">
+    <tr><td style="padding: 6px 12px; font-weight: bold; width: 130px;">Workflow</td>
+        <td style="padding: 6px 12px;"><code>{workflow_id}</code></td></tr>
+    <tr><td style="padding: 6px 12px; font-weight: bold;">Database</td>
+        <td style="padding: 6px 12px;">{database_id}</td></tr>
+    <tr><td style="padding: 6px 12px; font-weight: bold;">Environment</td>
+        <td style="padding: 6px 12px;">{environment}</td></tr>
+    <tr><td style="padding: 6px 12px; font-weight: bold;">Alert Type</td>
+        <td style="padding: 6px 12px;">{alert_type}</td></tr>
+  </table>
+
+  <p style="color: #c62828; font-size: 16px; font-weight: bold;">
+    This workflow has been ESCALATED and requires manual attention.
+  </p>
+
+  <h3>Reasons</h3>
+  <ul>{reasons_html}</ul>
+
+  <hr style="margin: 24px 0; border: none; border-top: 1px solid #ddd;">
+
+  <p style="color: #666; font-size: 13px;">
+    CLI: <code>sentri resolve {short_id} --reason "..."</code>
+  </p>
+</div>
+</body>
+</html>"""
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"] = from_addr
+    msg["To"] = ", ".join(to_addrs)
+
+    msg.attach(MIMEText(text_body, "plain"))
+    msg.attach(MIMEText(html_body, "html"))
+
+    ok = _send_smtp(
+        smtp_server,
+        smtp_port,
+        from_addr,
+        to_addrs,
+        msg,
+        username,
+        password,
+        use_tls,
+    )
+    if ok:
+        logger.info(
+            "Escalation email sent to %s for workflow %s [WF:%s]",
+            ", ".join(to_addrs),
+            workflow_id,
+            short_id,
+        )
+    return ok

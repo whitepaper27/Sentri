@@ -84,7 +84,7 @@ class SafetyMesh:
     The Executor's internal safety checks remain as defense-in-depth.
     """
 
-    # Circuit breaker defaults (overridable via brain/safety_mesh.md)
+    # Circuit breaker defaults (overridable via brain/rules.md Circuit Breaker section)
     CIRCUIT_BREAKER_THRESHOLD = 3
     CIRCUIT_BREAKER_HOURS = 24
 
@@ -376,9 +376,14 @@ class SafetyMesh:
     def _check_circuit_breaker(self, workflow: Workflow) -> MeshVerdict:
         """Too many recent failures on this database?
 
-        If >= CIRCUIT_BREAKER_THRESHOLD failures in the last
-        CIRCUIT_BREAKER_HOURS hours, block execution.
+        If >= threshold failures in the last N hours, block execution.
+        Threshold and window are configurable via brain/rules.md
+        Circuit Breaker section (defaults: 3 failures / 24h).
         """
+        # Read config from RulesEngine (DBA-configurable via rules.md)
+        threshold = getattr(self._rules, "circuit_breaker_threshold", self.CIRCUIT_BREAKER_THRESHOLD)
+        hours = getattr(self._rules, "circuit_breaker_hours", self.CIRCUIT_BREAKER_HOURS)
+
         rows = self._db.execute_read(
             """SELECT COUNT(*) as fail_count
                FROM audit_log
@@ -387,19 +392,19 @@ class SafetyMesh:
                AND timestamp > datetime('now', ?)""",
             (
                 workflow.database_id,
-                f"-{self.CIRCUIT_BREAKER_HOURS} hours",
+                f"-{hours} hours",
             ),
         )
 
         fail_count = rows[0]["fail_count"] if rows else 0
 
-        if fail_count >= self.CIRCUIT_BREAKER_THRESHOLD:
+        if fail_count >= threshold:
             return MeshVerdict(
                 decision=MeshDecision.BLOCK,
                 reasons=[
                     f"Circuit breaker: {fail_count} failures on "
-                    f"{workflow.database_id} in last {self.CIRCUIT_BREAKER_HOURS}h "
-                    f"(threshold={self.CIRCUIT_BREAKER_THRESHOLD})"
+                    f"{workflow.database_id} in last {hours}h "
+                    f"(threshold={threshold}, configurable in brain/rules.md)"
                 ],
                 blocked_by="circuit_breaker",
             )

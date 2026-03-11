@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 import uuid
 
 from sentri.core.exceptions import LLMError
@@ -22,12 +23,49 @@ from sentri.core.llm_interface import (
 
 logger = logging.getLogger("sentri.llm.provider")
 
-# Default models per provider
+# Default models per provider — PINNED to specific versions.
+# Floating aliases (e.g. "gpt-4o", "gemini-2.0-flash") can silently change
+# behaviour when the provider rotates the underlying model.
 _DEFAULT_MODELS = {
     "claude": "claude-sonnet-4-5-20250929",
-    "openai": "gpt-4o",
-    "gemini": "gemini-2.0-flash",
+    "openai": "gpt-4o-2024-08-06",
+    "gemini": "gemini-2.5-flash",
 }
+
+# Retry settings for transient API errors (429, 500, 503, timeouts).
+_MAX_RETRIES = 3
+_RETRY_BASE_DELAY = 1.0  # seconds — exponential: 1s, 2s, 4s
+
+# Error substrings that indicate a transient (retryable) failure.
+_RETRYABLE_PATTERNS = ("429", "500", "503", "rate limit", "overloaded", "timeout", "resource exhausted")
+
+
+def _is_retryable(error: Exception) -> bool:
+    """Check if an exception is a transient API error worth retrying."""
+    msg = str(error).lower()
+    return any(p in msg for p in _RETRYABLE_PATTERNS)
+
+
+def _retry_on_transient(fn, *args, **kwargs):
+    """Call *fn* with retry + exponential backoff on transient errors.
+
+    Non-retryable errors (400, 401, 404, invalid model) raise immediately.
+    """
+    last_error = None
+    for attempt in range(_MAX_RETRIES):
+        try:
+            return fn(*args, **kwargs)
+        except Exception as e:
+            last_error = e
+            if not _is_retryable(e) or attempt == _MAX_RETRIES - 1:
+                raise
+            delay = _RETRY_BASE_DELAY * (2 ** attempt)
+            logger.warning(
+                "Transient LLM error (attempt %d/%d), retrying in %.1fs: %s",
+                attempt + 1, _MAX_RETRIES, delay, e,
+            )
+            time.sleep(delay)
+    raise last_error  # type: ignore[misc]
 
 
 class ClaudeProvider(LLMProvider):
@@ -63,6 +101,7 @@ class ClaudeProvider(LLMProvider):
         system_prompt: str = "",
         temperature: float = 0.3,
         max_tokens: int = 2048,
+        json_mode: bool = False,
     ) -> str:
         client = self._get_client()
         try:
@@ -74,8 +113,9 @@ class ClaudeProvider(LLMProvider):
             }
             if system_prompt:
                 kwargs["system"] = system_prompt
+            # Claude doesn't have native JSON mode — relies on prompt instruction
 
-            response = client.messages.create(**kwargs)
+            response = _retry_on_transient(client.messages.create, **kwargs)
             return response.content[0].text
         except Exception as e:
             raise LLMError(f"Claude API error: {e}") from e
@@ -110,7 +150,7 @@ class ClaudeProvider(LLMProvider):
             if system_prompt:
                 kwargs["system"] = system_prompt
 
-            response = client.messages.create(**kwargs)
+            response = _retry_on_transient(client.messages.create, **kwargs)
 
             # Parse response: Claude returns content blocks
             text_parts = []
@@ -178,6 +218,10 @@ class ClaudeProvider(LLMProvider):
     def name(self) -> str:
         return "Claude"
 
+    @property
+    def model_id(self) -> str:
+        return self._model
+
 
 class OpenAIProvider(LLMProvider):
     """OpenAI API provider."""
@@ -205,6 +249,7 @@ class OpenAIProvider(LLMProvider):
         system_prompt: str = "",
         temperature: float = 0.3,
         max_tokens: int = 2048,
+        json_mode: bool = False,
     ) -> str:
         client = self._get_client()
         try:
@@ -213,11 +258,17 @@ class OpenAIProvider(LLMProvider):
                 messages.append({"role": "system", "content": system_prompt})
             messages.append({"role": "user", "content": prompt})
 
-            response = client.chat.completions.create(
-                model=self._model,
-                messages=messages,
-                temperature=temperature,
-                max_tokens=max_tokens,
+            kwargs = {
+                "model": self._model,
+                "messages": messages,
+                "temperature": temperature,
+                "max_tokens": max_tokens,
+            }
+            if json_mode:
+                kwargs["response_format"] = {"type": "json_object"}
+
+            response = _retry_on_transient(
+                client.chat.completions.create, **kwargs
             )
             return response.choices[0].message.content or ""
         except Exception as e:
@@ -251,7 +302,8 @@ class OpenAIProvider(LLMProvider):
                 all_messages.append({"role": "system", "content": system_prompt})
             all_messages.extend(messages)
 
-            response = client.chat.completions.create(
+            response = _retry_on_transient(
+                client.chat.completions.create,
                 model=self._model,
                 messages=all_messages,
                 tools=oai_tools,
@@ -320,6 +372,10 @@ class OpenAIProvider(LLMProvider):
     def name(self) -> str:
         return "OpenAI"
 
+    @property
+    def model_id(self) -> str:
+        return self._model
+
 
 class GeminiProvider(LLMProvider):
     """Google Gemini API provider."""
@@ -351,22 +407,41 @@ class GeminiProvider(LLMProvider):
         system_prompt: str = "",
         temperature: float = 0.3,
         max_tokens: int = 2048,
+        json_mode: bool = False,
     ) -> str:
         client = self._get_client()
-        try:
-            full_prompt = prompt
-            if system_prompt:
-                full_prompt = f"{system_prompt}\n\n---\n\n{prompt}"
+        full_prompt = prompt
+        if system_prompt:
+            full_prompt = f"{system_prompt}\n\n---\n\n{prompt}"
 
-            response = client.generate_content(
+        gen_config = {
+            "temperature": temperature,
+            "max_output_tokens": max_tokens,
+        }
+        if json_mode:
+            gen_config["response_mime_type"] = "application/json"
+
+        try:
+            response = _retry_on_transient(
+                client.generate_content,
                 full_prompt,
-                generation_config={
-                    "temperature": temperature,
-                    "max_output_tokens": max_tokens,
-                },
+                generation_config=gen_config,
             )
             return response.text or ""
         except Exception as e:
+            # response_mime_type may not be supported on older
+            # google-generativeai versions — retry without it.
+            if json_mode and "response_mime_type" in str(e):
+                logger.warning(
+                    "Gemini json_mode not supported, retrying without: %s", e,
+                )
+                gen_config.pop("response_mime_type", None)
+                response = _retry_on_transient(
+                    client.generate_content,
+                    full_prompt,
+                    generation_config=gen_config,
+                )
+                return response.text or ""
             raise LLMError(f"Gemini API error: {e}") from e
 
     def generate_with_tools(
@@ -429,7 +504,8 @@ class GeminiProvider(LLMProvider):
                         )
                     else:
                         parts.append(genai.protos.Part(text=str(item)))
-                response = chat.send_message(
+                response = _retry_on_transient(
+                    chat.send_message,
                     parts,
                     generation_config={
                         "temperature": temperature,
@@ -437,7 +513,8 @@ class GeminiProvider(LLMProvider):
                     },
                 )
             else:
-                response = chat.send_message(
+                response = _retry_on_transient(
+                    chat.send_message,
                     str(last_content),
                     generation_config={
                         "temperature": temperature,
@@ -509,6 +586,10 @@ class GeminiProvider(LLMProvider):
     @property
     def name(self) -> str:
         return "Gemini"
+
+    @property
+    def model_id(self) -> str:
+        return self._model
 
 
 def _json_schema_to_gemini_schema(schema: dict) -> dict:

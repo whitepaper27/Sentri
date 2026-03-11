@@ -125,8 +125,8 @@ def start_cmd(foreground: bool):
         cache_repo = CacheRepository(db)
         cost_tracker = CostTracker(cache_repo, learning_cfg.daily_cost_limit)
         console.print(
-            "[green]Researcher LLM:[/green] %s (budget: $%.2f/day)"
-            % (researcher_llm.name, learning_cfg.daily_cost_limit)
+            "[green]Researcher LLM:[/green] %s [dim](%s)[/dim] (budget: $%.2f/day)"
+            % (researcher_llm.name, researcher_llm.model_id, learning_cfg.daily_cost_limit)
         )
     else:
         console.print("[dim]Researcher LLM: not configured — using template fallback[/dim]")
@@ -150,7 +150,7 @@ def start_cmd(foreground: bool):
                 if p.is_available():
                     judge_providers.append(p)
         if judge_providers:
-            names = [p.name for p in judge_providers]
+            names = ["%s/%s" % (p.name, p.model_id) for p in judge_providers]
             console.print("[green]Judge panel:[/green] diverse (%s)" % ", ".join(names))
     elif judge_cfg:
         # Use a specific provider for all judges

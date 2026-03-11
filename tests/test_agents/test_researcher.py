@@ -25,6 +25,7 @@ def mock_llm():
     llm = MagicMock()
     llm.is_available.return_value = True
     llm.name = "MockLLM"
+    llm.model_id = "mock-model-v1"
     return llm
 
 

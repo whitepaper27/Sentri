@@ -463,7 +463,8 @@ class RCAAgent(SpecialistBase):
                 prompt=user_prompt,
                 system_prompt=RCA_SYSTEM_PROMPT,
                 temperature=0.3,
-                max_tokens=2048,
+                max_tokens=3072,
+                json_mode=True,
             )
             return self._parse_theories(raw)
         except Exception as e:

@@ -51,21 +51,32 @@ class QueryRunner:
 
         def _run():
             nonlocal result, error
+            cursor = None
             try:
                 cursor = connection.cursor()
                 cursor.execute(sql, filtered)
                 columns = [col[0].lower() for col in cursor.description or []]
                 rows = cursor.fetchall()
                 result = [dict(zip(columns, row)) for row in rows]
-                cursor.close()
             except Exception as e:
                 error = e
+            finally:
+                if cursor is not None:
+                    try:
+                        cursor.close()
+                    except Exception:
+                        pass
 
         thread = threading.Thread(target=_run, daemon=True)
         thread.start()
         thread.join(timeout=effective_timeout)
 
         if thread.is_alive():
+            # Cancel the in-flight query if possible
+            try:
+                connection.cancel()
+            except Exception:
+                pass
             raise VerificationTimeoutError(
                 f"Query timed out after {effective_timeout}s: {sql[:100]}"
             )
@@ -93,19 +104,29 @@ class QueryRunner:
 
         def _run():
             nonlocal rowcount, error
+            cursor = None
             try:
                 cursor = connection.cursor()
                 cursor.execute(sql, filtered)
                 rowcount = cursor.rowcount
-                cursor.close()
             except Exception as e:
                 error = e
+            finally:
+                if cursor is not None:
+                    try:
+                        cursor.close()
+                    except Exception:
+                        pass
 
         thread = threading.Thread(target=_run, daemon=True)
         thread.start()
         thread.join(timeout=effective_timeout)
 
         if thread.is_alive():
+            try:
+                connection.cancel()
+            except Exception:
+                pass
             raise OracleQueryError(f"Write query timed out after {effective_timeout}s: {sql[:100]}")
         if error:
             raise OracleQueryError(f"Write query failed: {error}") from error

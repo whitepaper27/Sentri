@@ -71,6 +71,10 @@ class RulesEngine:
         self._protected_databases: dict[str, str] = {}
         self._confidence_block: float = self._DEFAULT_CONFIDENCE_BLOCK
         self._confidence_approval: float = self._DEFAULT_CONFIDENCE_APPROVAL
+        self.circuit_breaker_threshold: int = 3
+        self.circuit_breaker_hours: int = 24
+        self.rca_alert_count: int = 3
+        self.rca_window_hours: int = 24
         self._loaded = False
 
     def _ensure_loaded(self) -> None:
@@ -88,15 +92,19 @@ class RulesEngine:
         self._parse_protected_schemas()
         self._parse_protected_databases()
         self._parse_session_kill_rules()
+        self._parse_circuit_breaker()
+        self._parse_rca_thresholds()
         self._loaded = True
         logger.info(
             "Rules loaded: %d action types, %d protected sessions, %d protected DBs, "
-            "confidence block=%.2f approval=%.2f",
+            "confidence block=%.2f approval=%.2f, circuit breaker=%d failures/%dh",
             len(self._action_matrix),
             len(self._protected_sessions),
             len(self._protected_databases),
             self._confidence_block,
             self._confidence_approval,
+            self.circuit_breaker_threshold,
+            self.circuit_breaker_hours,
         )
 
     def reload(self) -> None:
@@ -175,13 +183,8 @@ class RulesEngine:
                 verdict = v.verdict
                 reasons.extend(v.reasons)
 
-        # 6. Check repeat alert rules
-        v = self._check_repeat_alerts(recent_same_alerts, hours_since_last_same)
-        if v.verdict.severity > verdict.severity:
-            verdict = v.verdict
-            reasons.extend(v.reasons)
-        if v.blocked:
-            return RuleVerdict(Verdict.BLOCK, reasons, "repeat_alert_rules")
+        # 6. Repeat alert observability (logs patterns, never blocks)
+        self._check_repeat_alerts(recent_same_alerts, hours_since_last_same)
 
         # 7. Check protected schemas (for DDL/DML)
         # This would be checked at SQL-level — handled by the executor
@@ -267,18 +270,22 @@ class RulesEngine:
         return RuleVerdict(Verdict.ALLOW)
 
     def _check_repeat_alerts(self, recent_count: int, hours_since_last: float) -> RuleVerdict:
-        """Check repeat alert rules."""
-        # Same alert within 6 hours — do not repeat
+        """Log repeat alert patterns for observability. Never blocks.
+
+        Blocking decisions belong to the DBA via the action+environment
+        matrix in rules.md and per-database autonomy in environments/*.md.
+        The circuit breaker (Safety Mesh) catches genuinely broken scenarios.
+        """
+        # Observability only — log patterns, never block
         if hours_since_last < 6:
-            return RuleVerdict(
-                Verdict.BLOCK,
-                [f"Same alert fired {hours_since_last:.1f}h ago (< 6h) — escalate, do not repeat"],
+            logger.info(
+                "Repeat alert: same alert fired %.1fh ago (< 6h) — proceeding per policy",
+                hours_since_last,
             )
-        # 3+ in 24 hours — escalate
         if recent_count >= 3:
-            return RuleVerdict(
-                Verdict.BLOCK,
-                [f"Same alert fired {recent_count}x in 24h (>= 3) — escalate to manager"],
+            logger.info(
+                "Repeat alert: same alert fired %dx in 24h — consider root cause investigation",
+                recent_count,
             )
         return RuleVerdict(Verdict.ALLOW)
 
@@ -511,3 +518,76 @@ class RulesEngine:
                 self._protected_programs.extend(patterns)
 
         logger.debug("Protected programs: %s", self._protected_programs)
+
+    def _parse_circuit_breaker(self) -> None:
+        """Parse circuit breaker config from rules.md.
+
+        Expected format in rules.md:
+          ## Circuit Breaker
+          | Setting | Value |
+          |---------|-------|
+          | failure_threshold | 3 |
+          | window_hours | 24 |
+        """
+        section = self._rules.get("circuit_breaker", {})
+        text = ""
+        if isinstance(section, str):
+            text = section
+        elif isinstance(section, dict):
+            text = section.get("text", "")
+
+        if not text:
+            return
+
+        for line in text.split("\n"):
+            line = line.strip()
+            if not line.startswith("|") or "---" in line:
+                continue
+            cells = [c.strip() for c in line.split("|") if c.strip()]
+            if len(cells) < 2:
+                continue
+            key = cells[0].lower().replace(" ", "_")
+            try:
+                val = int(cells[1])
+            except ValueError:
+                continue
+            if "threshold" in key:
+                self.circuit_breaker_threshold = val
+            elif "hour" in key or "window" in key:
+                self.circuit_breaker_hours = val
+
+    def _parse_rca_thresholds(self) -> None:
+        """Parse RCA recommendation thresholds from rules.md.
+
+        Expected format:
+          ### RCA Recommendation Thresholds
+          | Setting | Value | Description |
+          | rca_alert_count | 3 | ... |
+          | rca_window_hours | 24 | ... |
+        """
+        section = self._rules.get("rca_recommendation_thresholds", {})
+        text = ""
+        if isinstance(section, str):
+            text = section
+        elif isinstance(section, dict):
+            text = section.get("text", "")
+
+        if not text:
+            return
+
+        for line in text.split("\n"):
+            line = line.strip()
+            if not line.startswith("|") or "---" in line:
+                continue
+            cells = [c.strip() for c in line.split("|") if c.strip()]
+            if len(cells) < 2:
+                continue
+            key = cells[0].lower().replace(" ", "_")
+            try:
+                val = int(cells[1])
+            except ValueError:
+                continue
+            if "count" in key:
+                self.rca_alert_count = val
+            elif "hour" in key or "window" in key:
+                self.rca_window_hours = val

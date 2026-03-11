@@ -264,10 +264,11 @@ class MemoryManager:
         )
         return ctx
 
-    def format_for_prompt(self, ctx: MemoryContext) -> str:
+    def format_for_prompt(self, ctx: MemoryContext, max_chars: int = 4000) -> str:
         """Format memory context as human-readable text for LLM prompt injection.
 
         Returns empty string if no memory exists (skip the section entirely).
+        Truncates to *max_chars* (~1 000 tokens) to prevent prompt overflow.
         """
         if not ctx.has_memory:
             return ""
@@ -356,7 +357,13 @@ class MemoryManager:
             "- If 3+ actions on the same database in 24 hours, recommend root cause investigation"
         )
 
-        return "\n".join(parts)
+        result = "\n".join(parts)
+        if len(result) > max_chars:
+            logger.info(
+                "Memory context truncated: %d -> %d chars", len(result), max_chars
+            )
+            result = result[:max_chars] + "\n\n[... memory context truncated]"
+        return result
 
     # ------------------------------------------------------------------
     # Config loading

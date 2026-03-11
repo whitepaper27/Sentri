@@ -7,7 +7,7 @@
 [![PyPI](https://img.shields.io/pypi/v/sentri-dba)](https://pypi.org/project/sentri-dba/)
 ![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)
 ![License](https://img.shields.io/badge/license-Apache%202.0-green)
-![Tests](https://img.shields.io/badge/tests-847%20passed-brightgreen)
+![Tests](https://img.shields.io/badge/tests-815%20passed-brightgreen)
 
 <p align="center">
   <img src="docs/demo.gif" alt="Sentri Demo" width="720">
@@ -246,10 +246,12 @@ No enum, no code change, no restart. Sentri picks it up on the next poll cycle.
 - **Proactive health checks** — catch problems BEFORE they trigger alerts (stale stats, tablespace trends, etc.)
 - **Cost gate** — historical success rate determines LLM depth (most alerts = zero LLM cost)
 - **Email approval flow** — DBA replies APPROVED/DENIED to approval emails
+- **Full notification coverage** — completion, escalation, timeout, and denial emails at every terminal workflow state
+- **RCA recommendations** — repeat alerts trigger root cause investigation recommendations in completion emails (configurable threshold in `brain/rules.md`)
 
 ### Extensibility
 
-- **`.md`-driven everything** — alerts, health checks, policies, agent behavior
+- **`.md`-driven everything** — alerts, health checks, policies, agent behavior. All blocking decisions belong to DBAs via `.md` files — Sentri never imposes hardcoded restrictions
 - **Multi-provider LLM** — Claude, OpenAI, Gemini, or no LLM at all
 - **9 alert types** out of the box, add more by dropping a file
 - **7 proactive health checks** included
@@ -463,7 +465,7 @@ DETECTED --> VERIFYING --> VERIFIED --> EXECUTING --> COMPLETED
 # Install with all dependencies
 pip install -e ".[dev,llm]"
 
-# Run tests (847 tests)
+# Run tests (815 tests)
 python -m pytest tests/ -x -q --ignore=tests/integration --ignore=tests/e2e
 
 # Lint

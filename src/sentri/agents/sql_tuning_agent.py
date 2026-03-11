@@ -301,7 +301,8 @@ class SQLTuningAgent(SpecialistBase):
                 prompt=user_prompt,
                 system_prompt=SQL_TUNING_SYSTEM_PROMPT,
                 temperature=0.3,
-                max_tokens=2048,
+                max_tokens=3072,
+                json_mode=True,
             )
             return self._parse_options(raw)
         except Exception as e:

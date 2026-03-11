@@ -164,6 +164,14 @@ QUERIES: dict[str, str] = {
         FROM v$resource_limit
         WHERE resource_name IN ('processes', 'sessions', 'transactions')
     """,
+    # ---- Session Container ID ----
+    # 17. Actual session container ID (v$database.con_id is always 0 — useless)
+    #     SYS_CONTEXT returns the PDB con_id (3+ for PDBs, 1 for CDB$ROOT)
+    "session_container": """
+        SELECT SYS_CONTEXT('USERENV', 'CON_ID') AS con_id,
+               SYS_CONTEXT('USERENV', 'CON_NAME') AS con_name
+        FROM dual
+    """,
 }
 
 
@@ -267,6 +275,17 @@ class ProfilerAgent:
         if db_id_rows:
             info = db_id_rows[0]
             profile.is_cdb = str(info.get("cdb", "NO")).upper() == "YES"
+
+        # --- Session container ID ---
+        # v$database.con_id is always 0 (database-level, NOT session-level).
+        # Use SYS_CONTEXT('USERENV', 'CON_ID') to detect the actual PDB.
+        # PDB connections return con_id >= 3, CDB$ROOT returns 1.
+        session_rows = cfg.get("session_container", [])
+        if session_rows:
+            profile.con_id = int(session_rows[0].get("con_id", 0))
+        elif db_id_rows:
+            # Fallback to v$database.con_id (always 0, but better than nothing)
+            profile.con_id = int(db_id_rows[0].get("con_id", 0))
 
         # --- DB size ---
         size_rows = cfg.get("db_size", [])

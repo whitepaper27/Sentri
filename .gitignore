@@ -1,4 +1,5 @@
 __pycache__/
+eval/results/
 *.py[cod]
 *$py.class
 *.so
@@ -37,6 +38,8 @@ htmlcov/
 .DS_Store
 Thumbs.db
 ship.md
+Sentri_Evaluation_Playbook.md
+sentri-v5-dba-adoption-strategy.md
 
 # Secrets
 .env

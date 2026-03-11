@@ -152,8 +152,16 @@ class SQLValidator:
         return db_context.get("omf_enabled", False)
 
     def _check_cdb_condition(self, db_context: dict) -> bool:
-        """Check if the database is a CDB (container database)."""
-        return db_context.get("is_cdb", False)
+        """Check if we need CDB context switching.
+
+        If con_id > 1, we're already connected to a PDB — the session
+        context is correct and the rule should NOT fire.
+        """
+        if not db_context.get("is_cdb", False):
+            return False
+        # con_id 0 or 1 = CDB$ROOT (rule applies), >1 = PDB (already correct)
+        con_id = db_context.get("con_id", 0)
+        return con_id <= 1
 
     def _check_read_only_condition(self, db_context: dict) -> bool:
         """Check if the database is in read-only mode."""
@@ -189,14 +197,23 @@ class SQLValidator:
             # Is CDB?
             context["is_cdb"] = data.get("is_cdb", False)
 
+            # Container ID (0/1 = CDB$ROOT, >1 = PDB)
+            context["con_id"] = data.get("con_id", 0)
+
             # Is RAC?
             context["is_rac"] = data.get("is_rac", False)
 
-            # Open mode (from db_identity)
+            # Open mode from db_identity
             db_identity = db_config.get("db_identity", [])
             if db_identity and isinstance(db_identity, list):
                 context["open_mode"] = db_identity[0].get("open_mode", "")
                 context["database_role"] = db_identity[0].get("database_role", "")
+
+            # Fallback: get session con_id from raw session_container query
+            if not context["con_id"]:
+                session_rows = db_config.get("session_container", [])
+                if session_rows and isinstance(session_rows, list):
+                    context["con_id"] = int(session_rows[0].get("con_id", 0))
 
             # Tablespace type — we can't know from the profile alone which
             # tablespace the alert is about. The validator checks this at

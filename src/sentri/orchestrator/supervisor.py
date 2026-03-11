@@ -59,6 +59,8 @@ class Supervisor:
         self._routing_rules: list[RoutingRule] = []
         self._categories: dict[str, list[str]] = {}  # category → [alert_types]
         self._fallback_agent: str = "storage_agent"
+        self._rca_alert_count: int = 3
+        self._rca_window_hours: int = 24
         self._loaded = False
 
     def register_agent(self, name: str, agent: "SpecialistBase") -> None:
@@ -95,6 +97,7 @@ class Supervisor:
         if self._loaded:
             return
         self._load_routing_rules()
+        self._load_rca_thresholds()
         self._loaded = True
 
     def _load_routing_rules(self) -> None:
@@ -168,6 +171,49 @@ class Supervisor:
             self._fallback_agent,
         )
 
+    def _load_rca_thresholds(self) -> None:
+        """Parse RCA recommendation thresholds from brain/rules.md."""
+        try:
+            policy = self.context.policy_loader.load_brain("rules")
+        except Exception:
+            return
+
+        if not policy:
+            return
+
+        section = policy.get("rca_recommendation_thresholds", {})
+        text = ""
+        if isinstance(section, str):
+            text = section
+        elif isinstance(section, dict):
+            text = section.get("text", "")
+
+        if not text:
+            return
+
+        for line in text.split("\n"):
+            line = line.strip()
+            if not line.startswith("|") or "---" in line:
+                continue
+            cells = [c.strip() for c in line.split("|") if c.strip()]
+            if len(cells) < 2:
+                continue
+            key = cells[0].lower().replace(" ", "_")
+            try:
+                val = int(cells[1])
+            except ValueError:
+                continue
+            if "count" in key:
+                self._rca_alert_count = val
+            elif "hour" in key or "window" in key:
+                self._rca_window_hours = val
+
+        logger.info(
+            "RCA thresholds: %d alerts in %dh",
+            self._rca_alert_count,
+            self._rca_window_hours,
+        )
+
     # ------------------------------------------------------------------
     # Main processing cycle
     # ------------------------------------------------------------------
@@ -226,6 +272,12 @@ class Supervisor:
 
     def _route_workflow(self, wf: Workflow) -> None:
         """Route a single workflow to the correct specialist agent."""
+        # Optimistic lock: re-read status to prevent double-processing.
+        # If status changed since we fetched the batch, skip this workflow.
+        fresh = self.context.workflow_repo.get(wf.id)
+        if not fresh or fresh.status != wf.status:
+            return
+
         agent_name = self._match_routing_rule(wf.alert_type)
         agent = self._agents.get(agent_name)
 
@@ -244,6 +296,21 @@ class Supervisor:
                 wf.alert_type,
                 agent.name,
             )
+            # Audit the routing decision
+            try:
+                self.context.audit_repo.create(
+                    AuditRecord(
+                        workflow_id=wf.id,
+                        action_type="ROUTING_DECISION",
+                        database_id=wf.database_id,
+                        environment=wf.environment,
+                        executed_by="supervisor",
+                        result="ROUTED",
+                        evidence=f"agent={agent.name},alert_type={wf.alert_type},rule={agent_name}",
+                    )
+                )
+            except Exception:
+                pass  # Don't let audit failure block routing
             try:
                 result = agent.process(wf.id)
                 result_status = result.get("status", "?")
@@ -260,9 +327,19 @@ class Supervisor:
                         self._state_machine.transition(wf.id, WorkflowStatus.COMPLETED.value)
                     elif result_status in ("failure", "blocked"):
                         self._state_machine.transition(wf.id, WorkflowStatus.ESCALATED.value)
+
+                # Send notification based on agent result (specialist may have
+                # already advanced the status, so this is outside the safety net).
+                # Use updated_wf (fresh from DB) so email shows actual SQL + confidence.
+                notify_wf = updated_wf or wf
+                if result_status == "success":
+                    self._send_completion_notification(notify_wf)
+                elif result_status in ("failure", "blocked"):
+                    self._send_escalation_notification(notify_wf, [f"Agent {agent.name} returned {result_status}"])
             except Exception as e:
                 logger.error("Agent %s failed for %s: %s", agent.name, wf.id, e)
                 self._state_machine.transition(wf.id, WorkflowStatus.ESCALATED.value)
+                self._send_escalation_notification(wf, [f"Agent {agent.name} exception: {e}"])
         else:
             logger.error(
                 "No agent available for %s (alert_type=%s) — escalating",
@@ -270,6 +347,7 @@ class Supervisor:
                 wf.alert_type,
             )
             self._state_machine.transition(wf.id, WorkflowStatus.ESCALATED.value)
+            self._send_escalation_notification(wf, [f"No agent available for alert_type={wf.alert_type}"])
 
     def _handle_approved(self, wf: Workflow) -> None:
         """Execute an approved workflow using its stored execution plan."""
@@ -279,6 +357,7 @@ class Supervisor:
         if not wf.execution_plan:
             logger.warning("APPROVED workflow %s has no execution plan — escalating", wf.id)
             self._state_machine.transition(wf.id, WorkflowStatus.ESCALATED.value)
+            self._send_escalation_notification(wf, ["APPROVED workflow has no execution plan"])
             return
 
         try:
@@ -301,6 +380,7 @@ class Supervisor:
         try:
             self._state_machine.transition(wf.id, WorkflowStatus.COMPLETED.value)
             logger.info("APPROVED workflow %s executed successfully", wf.id)
+            self._send_completion_notification(wf)
         except Exception as e:
             logger.error("Execution failed for APPROVED workflow %s: %s", wf.id, e)
             try:
@@ -336,9 +416,11 @@ class Supervisor:
                 denial_reason,
             )
             self._state_machine.transition(wf.id, WorkflowStatus.ESCALATED.value)
+            self._send_escalation_notification(wf, [f"DBA escalation: {denial_reason}"])
         else:
             self._state_machine.transition(wf.id, WorkflowStatus.COMPLETED.value)
             logger.info("DENIED workflow %s completed (no action taken)", wf.id)
+            self._send_completion_notification(wf, result="DENIED")
 
         # Send denial notification
         self._send_denial_notification(wf, denied_by, denial_reason)
@@ -366,18 +448,97 @@ class Supervisor:
         except Exception as e:
             logger.warning("Denial notification failed for %s: %s", wf.id, e)
 
+    def _send_completion_notification(self, wf: Workflow, result: str = "SUCCESS") -> None:
+        """Send completion notification via NotificationRouter."""
+        if not self._notification_router:
+            return
+        try:
+            import json
+
+            from sentri.notifications.adapter import NotificationContext
+
+            forward_sql = ""
+            rollback_sql = ""
+            confidence = 0.0
+            reasons: list[str] = []
+
+            if wf.execution_plan:
+                try:
+                    plan = json.loads(wf.execution_plan)
+                    forward_sql = plan.get("forward_sql", "")
+                    rollback_sql = plan.get("rollback_sql", "")
+                except (json.JSONDecodeError, AttributeError):
+                    pass
+
+            if wf.verification:
+                try:
+                    vr = json.loads(wf.verification)
+                    confidence = vr.get("confidence", 0.0)
+                except (json.JSONDecodeError, AttributeError):
+                    pass
+
+            # Check for repeat alerts — add RCA recommendation if threshold exceeded
+            try:
+                recent_count, _ = self.context.workflow_repo.count_recent_same(
+                    wf.database_id, wf.alert_type, hours=self._rca_window_hours,
+                )
+                if recent_count >= self._rca_alert_count:
+                    reasons.append(
+                        f"REPEAT ALERT: {wf.alert_type} fired {recent_count}x "
+                        f"in {self._rca_window_hours}h on {wf.database_id} "
+                        f"-- root cause investigation recommended"
+                    )
+            except Exception:
+                pass  # Don't let RCA check failure block notification
+
+            ctx = NotificationContext(
+                workflow_id=wf.id,
+                database_id=wf.database_id,
+                alert_type=wf.alert_type,
+                environment=wf.environment,
+                result=result,
+                forward_sql=forward_sql,
+                rollback_sql=rollback_sql,
+                confidence=confidence,
+                reasons=reasons,
+            )
+            self._notification_router.send_completion_notice(ctx)
+        except Exception as e:
+            logger.warning("Completion notification failed for %s: %s", wf.id, e)
+
+    def _send_escalation_notification(self, wf: Workflow, reasons: list[str] | None = None) -> None:
+        """Send escalation notification via NotificationRouter."""
+        if not self._notification_router:
+            return
+        try:
+            from sentri.notifications.adapter import NotificationContext
+
+            ctx = NotificationContext(
+                workflow_id=wf.id,
+                database_id=wf.database_id,
+                alert_type=wf.alert_type,
+                environment=wf.environment,
+                reasons=reasons or [],
+            )
+            self._notification_router.send_escalation_notice(ctx)
+        except Exception as e:
+            logger.warning("Escalation notification failed for %s: %s", wf.id, e)
+
     def _check_approval_timeout(self, wf: Workflow) -> None:
         """Check if an AWAITING_APPROVAL workflow has timed out."""
         timeout_secs = self.context.settings.approvals.approval_timeout
-        if not wf.created_at:
+
+        # Use updated_at (set when status changed to AWAITING_APPROVAL),
+        # not created_at (which is when the alert was first detected).
+        ref_ts = wf.updated_at or wf.created_at
+        if not ref_ts:
             return
 
         try:
-            # Parse created_at and check if approval window has expired
-            if isinstance(wf.created_at, str):
-                created = datetime.fromisoformat(wf.created_at)
+            if isinstance(ref_ts, str):
+                created = datetime.fromisoformat(ref_ts)
             else:
-                created = wf.created_at
+                created = ref_ts
             if created.tzinfo is None:
                 created = created.replace(tzinfo=timezone.utc)
 

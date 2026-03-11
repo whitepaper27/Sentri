@@ -444,6 +444,41 @@ Future (v5.2): `sentri validate` will check `.md` files for syntax errors, missi
 
 ---
 
+## Notification Coverage
+
+Sentri sends email notifications at every terminal workflow state so the DBA always knows what happened:
+
+| Event | Email Content |
+|-------|-------------|
+| **Completion** (success) | Green banner, fix SQL executed, rollback SQL, confidence score, pre/post metrics |
+| **Completion** (failure) | Red banner, what failed, rollback status |
+| **Escalation** | Red banner, reasons for escalation (low confidence, circuit breaker, agent failure) |
+| **Timeout** | Approval timed out, workflow escalated |
+| **Denial** | DBA denied the workflow, reason included |
+
+### RCA Recommendations in Completion Emails
+
+When the same alert fires repeatedly on the same database, the completion email includes an amber "Recommendations" section suggesting root cause investigation. This is **informational only** — Sentri still executes the fix every time. The DBA decides whether to investigate root cause.
+
+Default: 3 alerts in 24 hours triggers the recommendation. Configurable in `brain/rules.md`:
+
+```markdown
+| Setting | Value | Description |
+|---------|-------|-------------|
+| rca_alert_count | 3 | Number of same alerts on same DB to trigger RCA recommendation |
+| rca_window_hours | 24 | Time window for counting repeat alerts |
+```
+
+### Design Philosophy: No Hardcoded Blocking
+
+**Sentri never blocks execution based on hardcoded rules.** All policy decisions — which alerts need approval, cooldown periods, freeze windows — are controlled by DBAs via `.md` files in `brain/`.
+
+If an alert fires 10 times in an hour, Sentri fixes it 10 times and tells the DBA "you might want to investigate root cause." It does NOT refuse to act, impose cooldowns, or second-guess the DBA's configuration. The DBA can add approval requirements in `brain/rules.md` if they want gating — that's their call, not Sentri's.
+
+This is intentional: Sentri is the executor, the DBA is the policy author. An autonomous agent that refuses to follow its own policies is worse than one that faithfully executes them.
+
+---
+
 ## What Comes After Phase 3
 
 **More alert types on PROD.** After 4+ weeks of clean `tablespace_full` / `temp_full` operation, add `archive_dest_full`, then `high_undo_usage`, then proactive checks. Same trust-building cycle: shadow → DEV → UAT → PROD.

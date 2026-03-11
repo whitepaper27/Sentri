@@ -113,9 +113,10 @@ class TestSupervisorApprovalTimeout:
         )
         wf_id = agent_context.workflow_repo.create(wf)
 
-        # Backdate created_at to 2 hours ago
+        # Backdate created_at and updated_at to 2 hours ago
         agent_context.db.execute_write(
-            "UPDATE workflows SET created_at = datetime('now', '-2 hours') WHERE id = ?",
+            "UPDATE workflows SET created_at = datetime('now', '-2 hours'), "
+            "updated_at = datetime('now', '-2 hours') WHERE id = ?",
             (wf_id,),
         )
 
@@ -164,7 +165,8 @@ class TestSupervisorApprovalTimeout:
         wf_id = agent_context.workflow_repo.create(wf)
 
         agent_context.db.execute_write(
-            "UPDATE workflows SET created_at = datetime('now', '-2 hours') WHERE id = ?",
+            "UPDATE workflows SET created_at = datetime('now', '-2 hours'), "
+            "updated_at = datetime('now', '-2 hours') WHERE id = ?",
             (wf_id,),
         )
 
@@ -198,7 +200,8 @@ class TestSupervisorApprovalTimeout:
         wf_id = agent_context.workflow_repo.create(wf)
 
         agent_context.db.execute_write(
-            "UPDATE workflows SET created_at = datetime('now', '-2 hours') WHERE id = ?",
+            "UPDATE workflows SET created_at = datetime('now', '-2 hours'), "
+            "updated_at = datetime('now', '-2 hours') WHERE id = ?",
             (wf_id,),
         )
 

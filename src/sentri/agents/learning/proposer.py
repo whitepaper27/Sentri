@@ -154,6 +154,7 @@ class Proposer:
                 system_prompt=PROPOSER_SYSTEM_PROMPT,
                 temperature=0.2,
                 max_tokens=1024,
+                json_mode=True,
             )
 
             # Parse response

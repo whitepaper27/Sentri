@@ -8,7 +8,12 @@ from __future__ import annotations
 import logging
 
 from .adapter import NotificationAdapter, NotificationContext
-from .email_sender import send_approval_request_email, send_timeout_notification_email
+from .email_sender import (
+    send_approval_request_email,
+    send_completion_email,
+    send_escalation_email,
+    send_timeout_notification_email,
+)
 
 logger = logging.getLogger("sentri.notifications.email_adapter")
 
@@ -78,14 +83,42 @@ class EmailAdapter(NotificationAdapter):
         )
 
     def send_completion_notice(self, ctx: NotificationContext) -> bool:
-        """Email completion notice (not yet implemented — returns False)."""
-        logger.debug("Email completion notice not implemented, skipping")
-        return False
+        """Send completion email showing fix SQL and result."""
+        return send_completion_email(
+            smtp_server=self._smtp_server,
+            smtp_port=self._smtp_port,
+            from_addr=self._from_addr,
+            to_addrs=self._to_addrs,
+            workflow_id=ctx.workflow_id,
+            database_id=ctx.database_id,
+            alert_type=ctx.alert_type,
+            environment=ctx.environment,
+            result=ctx.result,
+            forward_sql=ctx.forward_sql,
+            rollback_sql=ctx.rollback_sql,
+            confidence=ctx.confidence,
+            reasons=ctx.reasons,
+            username=self._username,
+            password=self._password,
+            use_tls=self._use_tls,
+        )
 
     def send_escalation_notice(self, ctx: NotificationContext) -> bool:
-        """Email escalation notice (not yet implemented — returns False)."""
-        logger.debug("Email escalation notice not implemented, skipping")
-        return False
+        """Send escalation email showing reasons for escalation."""
+        return send_escalation_email(
+            smtp_server=self._smtp_server,
+            smtp_port=self._smtp_port,
+            from_addr=self._from_addr,
+            to_addrs=self._to_addrs,
+            workflow_id=ctx.workflow_id,
+            database_id=ctx.database_id,
+            alert_type=ctx.alert_type,
+            environment=ctx.environment,
+            reasons=ctx.reasons,
+            username=self._username,
+            password=self._password,
+            use_tls=self._use_tls,
+        )
 
     def send_denial_notice(self, ctx: NotificationContext) -> bool:
         """Email denial notice (not yet implemented — returns False)."""

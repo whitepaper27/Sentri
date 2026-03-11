@@ -248,7 +248,8 @@ class SpecialistBase(BaseAgent):
                 prompt=user_prompt,
                 system_prompt=system_prompt,
                 temperature=0.2,
-                max_tokens=1024,
+                max_tokens=2048,
+                json_mode=True,
             )
             return self._parse_judge_response(raw, candidates, weights)
         except Exception as e:
@@ -613,22 +614,15 @@ class SpecialistBase(BaseAgent):
         weights: dict[str, float],
     ) -> list[ScoredCandidate]:
         """Parse the LLM judge response into ScoredCandidate objects."""
-        if not raw or not raw.strip():
-            return []
+        from sentri.llm.json_utils import extract_json_from_text
 
-        text = raw.strip()
-        # Strip markdown fences
-        if "```" in text:
-            import re as _re
+        data = extract_json_from_text(raw)
 
-            fence_match = _re.search(r"```(?:json)?\s*\n(.*?)```", text, _re.DOTALL)
-            if fence_match:
-                text = fence_match.group(1).strip()
-
-        try:
-            data = json.loads(text)
-        except json.JSONDecodeError:
-            self.logger.warning("Failed to parse judge response as JSON")
+        if data is None:
+            self.logger.warning(
+                "Failed to parse judge response as JSON. Raw (first 500 chars): %s",
+                (raw or "")[:500],
+            )
             return []
 
         if not isinstance(data, list):

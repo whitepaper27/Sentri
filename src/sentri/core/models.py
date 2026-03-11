@@ -201,6 +201,7 @@ class DatabaseProfile:
     omf_enabled: bool = False
     is_rac: bool = False
     is_cdb: bool = False
+    con_id: int = 0  # Container ID: 0/1=CDB$ROOT, >1=PDB
     critical_parameters: dict = field(default_factory=dict)
     workload_metrics: dict = field(default_factory=dict)
     risk_areas: list = field(default_factory=list)

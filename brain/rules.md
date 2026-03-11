@@ -122,11 +122,36 @@ When action_type is ADD_DATAFILE or ADD_TEMPFILE:
 
 ## Repeat Alert Rules
 
+Repeat alerts are logged for observability but **do not block execution**.
+DBA controls approval requirements via the Action Rules matrix above and
+per-database autonomy in `environments/*.md`. The Circuit Breaker (below)
+catches genuinely broken scenarios (repeated failures).
+
 | Condition | Action |
 |-----------|--------|
-| Same alert on same DB within 6 hours | Do not repeat the same fix. Escalate. |
-| Same alert 3+ times in 24 hours | Escalate to DBA manager. Possible root cause issue. |
-| Same alert 5+ times in 7 days | Flag for capacity planning review. |
+| Same alert on same DB within 6 hours | Logged as INFO. Proceed per action/environment policy. |
+| Same alert 3+ times in 24 hours | Logged as INFO. Consider root cause investigation. |
+| Same alert 5+ times in 7 days | Logged as INFO. Consider capacity planning review. |
+
+### RCA Recommendation Thresholds
+
+When the same alert fires repeatedly, Sentri includes an RCA recommendation in the
+completion email telling the DBA to investigate root cause. Configurable below.
+
+| Setting | Value | Description |
+|---------|-------|-------------|
+| rca_alert_count | 3 | Number of same alerts on same DB to trigger RCA recommendation |
+| rca_window_hours | 24 | Time window for counting repeat alerts |
+
+## Circuit Breaker
+
+Blocks execution when the same database has too many **FAILED** executions
+(ORA errors, rollbacks) in a time window. Configurable by DBA below.
+
+| Setting | Value |
+|---------|-------|
+| failure_threshold | 3 |
+| window_hours | 24 |
 
 ## Time Window Rules
 

@@ -113,6 +113,7 @@ class JudgePanel:
                 system_prompt=JUDGE_SYSTEM_PROMPT,
                 temperature=0.1 + (judge_number * 0.1),  # Vary temperature
                 max_tokens=512,
+                json_mode=True,
             )
 
             text = raw.strip()
