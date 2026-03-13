@@ -10,7 +10,7 @@
 ![Tests](https://img.shields.io/badge/tests-815%20passed-brightgreen)
 
 <p align="center">
-  <img src="docs/demo.gif" alt="Sentri Demo" width="720">
+  <img src="Sentri_Full_Demo.gif" alt="Sentri Full Demo" width="720">
 </p>
 
 ---
