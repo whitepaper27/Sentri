@@ -190,6 +190,7 @@ def start_cmd(foreground: bool):
     from sentri.agents.rca_agent import RCAAgent
     from sentri.agents.sql_tuning_agent import SQLTuningAgent
     from sentri.agents.storage_agent import StorageAgent
+    from sentri.agents.unknown_alert_agent import UnknownAlertAgent
     from sentri.orchestrator.safety_mesh import SafetyMesh
     from sentri.orchestrator.supervisor import Supervisor
     from sentri.policy.alert_patterns import AlertPatterns
@@ -259,6 +260,15 @@ def start_cmd(foreground: bool):
         notification_router=notification_router,
     )
 
+    unknown_alert_agent = UnknownAlertAgent(
+        context,
+        safety_mesh=safety_mesh,
+        llm_provider=researcher_llm,
+        cost_tracker=cost_tracker,
+        investigation_store=investigation_store,
+        notification_router=notification_router,
+    )
+
     # Create Supervisor (deterministic router — replaces Orchestrator)
     supervisor = Supervisor(
         context,
@@ -268,7 +278,8 @@ def start_cmd(foreground: bool):
     supervisor.register_agent("storage_agent", storage_agent)
     supervisor.register_agent("sql_tuning_agent", sql_tuning_agent)
     supervisor.register_agent("rca_agent", rca_agent)
-    console.print("[green]Supervisor:[/green] 3 specialist agents registered")
+    supervisor.register_agent("unknown_alert_agent", unknown_alert_agent)
+    console.print("[green]Supervisor:[/green] 4 specialist agents registered")
 
     # Create ProactiveAgent (scheduled health checks)
     proactive_agent = ProactiveAgent(context, alert_event=scout.alert_event)

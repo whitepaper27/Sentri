@@ -7,7 +7,7 @@
 [![PyPI](https://img.shields.io/pypi/v/sentri-dba)](https://pypi.org/project/sentri-dba/)
 ![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)
 ![License](https://img.shields.io/badge/license-Apache%202.0-green)
-![Tests](https://img.shields.io/badge/tests-815%20passed-brightgreen)
+![Tests](https://img.shields.io/badge/tests-879%20passed-brightgreen)
 
 <p align="center">
   <img src="Sentri_Full_Demo.gif" alt="Sentri Full Demo" width="720">
@@ -46,9 +46,9 @@ Sentri monitors your DBA alert emails, verifies problems against real database s
              |
     ┌────────┼──────────┬──────────┐
     v        v          v          v
- Storage   SQL       RCA       Future
- Agent     Tuning    Agent     Agent
-           Agent
+ Storage   SQL       RCA     Unknown
+ Agent     Tuning    Agent   Alert
+           Agent             Agent
     └────────┼──────────┼──────────┘
              v
   ┌──────────────────────────┐
@@ -220,6 +220,19 @@ ALTER TABLESPACE :tablespace_name DROP DATAFILE ':new_datafile_path'
 
 No enum, no code change, no restart. Sentri picks it up on the next poll cycle.
 
+### Unknown Alert Bootstrap (Auto-Learning)
+
+If Sentri receives an alert email that doesn't match any existing `.md` pattern, it doesn't just drop it — it learns:
+
+1. **LLM classifies** the email — determines alert type, severity, and target database
+2. **Investigates** the database using DBA tools to confirm the issue
+3. **Generates remediation** options with SQL to fix it
+4. **Always requires approval** — unknown alerts are untrusted, regardless of environment
+5. **Auto-generates `.md`** — after successful resolution, creates an `alerts/*.md` file with the pattern, queries, and fix SQL
+6. **Next occurrence → normal flow** — the `.md` exists now, so DEV=auto, PROD=per policy
+
+This turns Sentri from "only handles pre-defined alerts" to "handles anything, learns from approval, becomes autonomous over time."
+
 ---
 
 ## Features
@@ -242,7 +255,7 @@ No enum, no code change, no restart. Sentri picks it up on the next poll cycle.
 
 ### Autonomy
 
-- **4 specialist agents** — Storage, SQL Tuning, RCA (root cause analysis), Proactive Health
+- **5 specialist agents** — Storage, SQL Tuning, RCA (root cause analysis), Unknown Alert (auto-learning), Proactive Health
 - **Proactive health checks** — catch problems BEFORE they trigger alerts (stale stats, tablespace trends, etc.)
 - **Cost gate** — historical success rate determines LLM depth (most alerts = zero LLM cost)
 - **Email approval flow** — DBA replies APPROVED/DENIED to approval emails
@@ -253,7 +266,8 @@ No enum, no code change, no restart. Sentri picks it up on the next poll cycle.
 
 - **`.md`-driven everything** — alerts, health checks, policies, agent behavior. All blocking decisions belong to DBAs via `.md` files — Sentri never imposes hardcoded restrictions
 - **Multi-provider LLM** — Claude, OpenAI, Gemini, or no LLM at all
-- **9 alert types** out of the box, add more by dropping a file
+- **9 alert types** out of the box, add more by dropping a file — or let Sentri learn new ones automatically
+- **Unknown alert bootstrap** — unrecognized emails are classified by LLM, fixed with approval, then auto-generate `.md` for future autonomy
 - **7 proactive health checks** included
 
 ---
@@ -465,7 +479,7 @@ DETECTED --> VERIFYING --> VERIFIED --> EXECUTING --> COMPLETED
 # Install with all dependencies
 pip install -e ".[dev,llm]"
 
-# Run tests (815 tests)
+# Run tests (879 tests)
 python -m pytest tests/ -x -q --ignore=tests/integration --ignore=tests/e2e
 
 # Lint

@@ -300,8 +300,15 @@ class ScoutAgent(BaseAgent):
                     extracted_data=extracted,
                 )
 
-        self.logger.debug("No pattern matched for: %s", subject[:100])
-        return None
+        # No pattern matched — create unknown alert for LLM classification
+        self.logger.info("No pattern matched for: %s — creating unknown alert", subject[:100])
+        return Suggestion(
+            alert_type="unknown",
+            database_id="UNKNOWN",
+            raw_email_subject=subject,
+            raw_email_body=body[:2000],
+            extracted_data={"raw_subject": subject, "raw_body": body[:2000]},
+        )
 
     def _extract_fields(self, match: re.Match, alert_type: str) -> dict:
         """Extract named fields from regex match based on alert policy."""

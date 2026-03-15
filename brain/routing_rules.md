@@ -21,6 +21,7 @@ to specialist agents, defines categories for correlation, and sets fallback.
 - check_finding:stale_stats → sql_tuning_agent
 - check_finding:tablespace_trend → storage_agent
 - check_finding:* → storage_agent
+- unknown → unknown_alert_agent
 
 ## Alert Categories
 

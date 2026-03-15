@@ -55,8 +55,8 @@ def test_scout_creates_workflow(agent_context):
     assert wf.alert_type == "tablespace_full"
 
 
-def test_scout_no_match(agent_context):
-    """Test that unrecognized emails return None."""
+def test_scout_no_match_creates_unknown(agent_context):
+    """Test that unrecognized emails create an 'unknown' alert workflow."""
     scout = ScoutAgent(agent_context)
     scout.load_patterns()
 
@@ -64,7 +64,10 @@ def test_scout_no_match(agent_context):
         subject="Weekly DBA Report",
         body="Here is the weekly summary of database operations.",
     )
-    assert wf_id is None
+    assert wf_id is not None
+    wf = agent_context.workflow_repo.get(wf_id)
+    assert wf.alert_type == "unknown"
+    assert wf.database_id == "UNKNOWN"
 
 
 @pytest.mark.parametrize(

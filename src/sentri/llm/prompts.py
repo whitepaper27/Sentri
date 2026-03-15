@@ -433,3 +433,157 @@ def build_rca_prompt(
         environment=environment,
         investigation_data=investigation_data,
     )
+
+
+# ---------------------------------------------------------------------------
+# v5.2: Unknown Alert Agent prompts
+# ---------------------------------------------------------------------------
+
+UNKNOWN_ALERT_CLASSIFY_SYSTEM_PROMPT = """\
+You are an expert Oracle DBA automation agent. You have received an email alert \
+that does not match any known alert pattern. Your task is to:
+
+1. **Classify** the alert — what type of database issue is this?
+2. **Extract** key information — which database, what's the problem, severity
+3. **Investigate** the database using your DBA tools to confirm the issue
+4. **Generate remediation** options with SQL to fix it
+
+## CLASSIFICATION
+Determine the alert_type name (lowercase, underscored). Use standard naming:
+- Storage: tablespace_full, temp_full, archive_dest_full, high_undo_usage
+- Performance: cpu_high, long_running_sql, session_blocker
+- Infrastructure: listener_down, rac_node_down, dataguard_lag, asm_disk_failure
+- Security: password_expiry, audit_trail_full
+- Backup: backup_freshness, rman_failure
+- Custom: use descriptive names like "exadata_cell_down", "redo_log_switch_rate"
+
+If this email is NOT a database alert (spam, newsletter, etc.), classify as \
+"not_a_db_alert" with confidence 0.0.
+
+## TOOLS
+You have the same DBA investigation tools as the standard researcher:
+- get_tablespace_info, get_db_parameters, get_storage_info, get_instance_info
+- query_database, get_sql_plan, get_sql_stats, get_table_stats
+- get_index_info, get_session_info, get_top_sql, get_wait_events
+
+## OUTPUT FORMAT
+Respond with ONLY a JSON object (no markdown fences):
+{
+  "alert_type": "classified_alert_type",
+  "database_id": "extracted database name or UNKNOWN",
+  "severity": "LOW|MEDIUM|HIGH|CRITICAL",
+  "description": "What this alert is about",
+  "email_pattern_regex": "regex that would match this email subject/body",
+  "extracted_fields": ["field_name = group(N) -- description"],
+  "options": [
+    {
+      "title": "Short descriptive title",
+      "description": "What this option does",
+      "forward_sql": "SQL to fix the issue",
+      "rollback_sql": "SQL to undo (or N/A)",
+      "confidence": 0.85,
+      "risk_level": "LOW|MEDIUM|HIGH",
+      "reasoning": "Why this works"
+    }
+  ],
+  "verification_query": "SQL to verify the alert is real",
+  "validation_query": "SQL to verify the fix worked"
+}
+
+Generate 2-4 remediation options. ALWAYS investigate the database first.
+"""
+
+UNKNOWN_ALERT_USER_PROMPT_TEMPLATE = """\
+UNRECOGNIZED ALERT EMAIL — no pattern matched.
+
+Email Subject: {subject}
+
+Email Body:
+{body}
+
+Database Profile (if available):
+{profile_data}
+
+Classify this alert, investigate the database, and generate remediation options.
+"""
+
+
+def build_unknown_alert_prompt(
+    subject: str,
+    body: str,
+    profile_data: str = "No database profile available",
+) -> str:
+    """Build the user prompt for the Unknown Alert Agent LLM call."""
+    return UNKNOWN_ALERT_USER_PROMPT_TEMPLATE.format(
+        subject=subject,
+        body=body,
+        profile_data=profile_data,
+    )
+
+
+GENERATE_ALERT_MD_SYSTEM_PROMPT = """\
+You are generating a Sentri alert policy .md file from a successfully resolved \
+unknown alert. The .md file will be used by Sentri to automatically handle this \
+alert type in the future.
+
+You will receive:
+1. The classified alert details (type, severity, regex, fields)
+2. The remediation that was successfully applied (SQL, rollback)
+3. The verification query used
+
+Generate a complete .md policy file following Sentri's exact format.
+
+Respond with ONLY the raw markdown content (no code fences around it). \
+The file must start with YAML frontmatter (---) and include all required sections.
+"""
+
+GENERATE_ALERT_MD_USER_TEMPLATE = """\
+Alert Type: {alert_type}
+Severity: {severity}
+Description: {description}
+
+Email Pattern Regex: {email_pattern_regex}
+
+Extracted Fields:
+{extracted_fields}
+
+Verification Query:
+{verification_query}
+
+Forward Action (SQL that fixed the issue):
+{forward_sql}
+
+Rollback Action:
+{rollback_sql}
+
+Validation Query:
+{validation_query}
+
+Generate a complete Sentri alert .md file for this alert type.
+"""
+
+
+def build_generate_alert_md_prompt(
+    alert_type: str,
+    severity: str,
+    description: str,
+    email_pattern_regex: str,
+    extracted_fields: list[str],
+    verification_query: str,
+    forward_sql: str,
+    rollback_sql: str,
+    validation_query: str,
+) -> str:
+    """Build the prompt for generating an alert .md file."""
+    fields_str = "\n".join(f"- {f}" for f in extracted_fields) if extracted_fields else "- (none)"
+    return GENERATE_ALERT_MD_USER_TEMPLATE.format(
+        alert_type=alert_type,
+        severity=severity,
+        description=description,
+        email_pattern_regex=email_pattern_regex,
+        extracted_fields=fields_str,
+        verification_query=verification_query or "-- not available",
+        forward_sql=forward_sql or "-- not available",
+        rollback_sql=rollback_sql or "-- N/A",
+        validation_query=validation_query or "-- not available",
+    )

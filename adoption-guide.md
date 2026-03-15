@@ -487,6 +487,16 @@ This is intentional: Sentri is the executor, the DBA is the policy author. An au
 
 **Custom alerts for your org.** Add `.md` files for your org-specific monitoring. See [Adding Alerts](docs/adding-alerts.md) for the full walkthrough.
 
+**Unknown Alert Bootstrap (auto-learning).** With an LLM configured, Sentri handles alerts it has never seen before. When an email arrives that doesn't match any `alerts/*.md` pattern — say, a RAC node eviction or Exadata cell failure — Sentri:
+1. Uses the LLM to classify the alert (determine type, severity, database)
+2. Investigates the database with DBA tools to confirm the issue
+3. Generates remediation options with SQL
+4. **Always requires approval** — unknown alerts are untrusted regardless of environment
+5. After successful resolution, **auto-generates an `alerts/*.md` file** with the regex, verification query, fix SQL, and rollback
+6. Next time the same alert fires, it matches the generated `.md` and follows normal routing (DEV=auto, PROD=per policy)
+
+This means Sentri learns from every new alert type it encounters. The generated `.md` files are version-controlled via git — review them, tune the regex, adjust the SQL. They're starting points, not black boxes.
+
 **LLM enablement.** If you started with template-only mode, add an API key to enable intelligent investigation. The cost gate means most alerts still use templates (zero cost); the LLM is reserved for novel situations.
 
 **Team scaling.** More databases, more alert types, more DBAs on the approval rotation. Add databases to `sentri.yaml` — Sentri profiles and monitors them automatically.
