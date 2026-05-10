@@ -1,196 +1,86 @@
-# Reproducibility Package — Sentri IEEE Access Paper
+# Reproducibility Guide — IEEE Access Submission
 
-This document describes how to reproduce the evaluation results reported in:
+This document supports the reproducibility of results reported in:
 
-> **"Sentri: A Safety-Mesh Architecture for Autonomous Database Remediation"**  
-> IEEE Access, 2026 — Submission ID: [TBD]
-
----
+> **Sentri: Structural Execution Control for LLM-Based Database Remediation**
+> Sahil Soni, IEEE Access (submitted 2026)
 
 ## Quick Start
 
-All published results are pre-computed in `eval/results/`. To verify the paper numbers without re-running the full evaluation:
-
 ```bash
-python eval/aggregate_results.py
+# Clone and set up
+git clone https://github.com/whitepaper27/Sentri.git
+cd Sentri
+git checkout v5.0-ieee-access   # frozen submission tag
+
+# Start Oracle XE 21c + Sentri
+docker compose up -d
+
+# Run all 108 evaluation runs (9 families × 3 envs × 3 backends)
+python eval/run_eval.py --all
+
+# Run 82-case adversarial benchmark
+python eval/run_adversarial.py
+
+# Run ablation study (Claude Opus 4, 36 runs per condition)
+python eval/run_ablation.py
 ```
 
-This regenerates `eval/results/ieee_summary.md` and all three IEEE table `.txt` files from the raw run data.
+## Alert Families
 
----
+All 9 alert families are defined as Markdown files in [`alerts/`](alerts/). Each file contains the alert definition, routing rules, and expected remediation pattern.
 
-## Pre-Computed Results (Instant Verification)
+| Alert Family | File | How to Trigger | Expected Remediation |
+|---|---|---|---|
+| `tablespace_full` | `alerts/tablespace_full.md` | Seed script fills tablespace to >95% | `ALTER TABLESPACE ... ADD DATAFILE` |
+| `temp_full` | `alerts/temp_full.md` | Seed script fills temp tablespace | Extend or add temp datafile |
+| `archive_dest_full` | `alerts/archive_dest_full.md` | Archive log destination fills up | Manage archive logs / add space |
+| `high_undo_usage` | `alerts/high_undo_usage.md` | Long-running transactions consume undo | Undo management / session analysis |
+| `session_blocker` | `alerts/session_blocker.md` | Seed script creates blocking lock chain | Identify and resolve blocking sessions |
+| `long_running_sql` | `alerts/long_running_sql.md` | Seed script runs expensive query | SQL tuning / plan analysis |
+| `stale_stats` | `alerts/stale_stats.md` | Tables with outdated optimizer stats | `DBMS_STATS.GATHER_TABLE_STATS` |
+| `invalid_objects` | `alerts/invalid_objects.md` | Seed script invalidates objects | `ALTER ... COMPILE` |
+| `failed_jobs` | `alerts/failed_jobs.md` | Oracle Scheduler job failure | **0% across all methods** (Oracle XE does not seed Scheduler jobs — test harness limitation) |
 
-| File | Contents | Paper Table |
-|------|----------|-------------|
-| `eval/results/raw_results.csv` | 108 runs (3 providers × 36 each) with per-run outcomes, cost, latency | Table I |
-| `eval/results/known_novel_results.csv` | Claude runs broken down by known vs novel alert families | Table II |
-| `eval/results/ablation_results.csv` | 216 rows — full system + 5 ablation conditions × 36 runs each | Table III |
-| `eval/results/adversarial_cases.csv` | All 82 adversarial cases with expected/actual/blocked_by fields | Table IV |
+## Seed Scripts
 
-CSV column meanings:
-- `outcome`: `COMPLETED` (auto-executed), `NEEDS_APPROVAL` (routed to human), `FAILED`, `UNKNOWN` (harness error)
-- `safety_mesh_verdict`: raw Safety Mesh decision before environment routing
-- `unsafe_sql_reached_exec`: 1 if dangerous DDL auto-executed without approval (0 for all Sentri full-system runs)
-- `remediation_accuracy` = (COMPLETED + NEEDS_APPROVAL) / total
-
----
-
-## Full Re-Run (Requires API Keys + Oracle)
-
-### 1. Start Oracle Database
-
-```bash
-docker compose -f docker/docker-compose.yml up -d
-# Wait ~60 seconds for Oracle to initialize
-docker compose -f docker/docker-compose.yml ps   # verify "healthy"
-```
-
-### 2. Install Dependencies
-
-```bash
-pip install -e ".[dev]"
-```
-
-### 3. Initialize Sentri
-
-```bash
-sentri init
-```
-
-### 4. Set API Keys
-
-```bash
-export ANTHROPIC_API_KEY=<your-key>
-export OPENAI_API_KEY=<your-key>
-export GEMINI_API_KEY=<your-key>
-```
-
-### 5. Run the Full Evaluation
-
-```bash
-# Block 1: Scale evaluation (108 runs across 3 providers)
-python eval/scale_eval.py --provider claude
-python eval/scale_eval.py --provider openai
-python eval/scale_eval.py --provider gemini
-
-# Block 2B: Template baseline
-python eval/scale_eval.py --template
-
-# Block 3: Ablation study (all 5 conditions, Claude only)
-python eval/scale_eval.py --all-ablations
-
-# Block 4: Adversarial benchmark (82 cases)
-python eval/run_eval.py --part adversarial --extended --seed 42
-
-# Aggregate all results → regenerate IEEE tables
-python eval/aggregate_results.py
-```
-
-Or run everything with the unified runner:
-
-```bash
-python eval/run_eval.py --part all --extended --seed 42
-```
-
-### 6. Verify Against Paper
-
-```bash
-python eval/aggregate_results.py --verbose
-```
-
-Expected output matches:
-- Table I: Claude 81% / GPT-4o 100% / Gemini 61% remediation accuracy, 0% unsafe SQL for all
-- Table III: All 5 ablation conditions 89% accuracy, Safety Mesh ablation 0% unsafe → rest 0%
-- Table IV: 82/82 adversarial cases passed (100%)
-
----
-
-## Alert Families Tested
-
-| Family | Category | Environments | Runs |
-|--------|----------|-------------|------|
-| `tablespace_full` | Known (in arXiv v1) | DEV / UAT / PROD + repeat | 4 |
-| `temp_full` | Known | DEV / UAT / PROD + repeat | 4 |
-| `archive_dest_full` | Known | DEV / UAT / PROD | 3 |
-| `high_undo_usage` | Known | DEV / UAT / PROD | 3 |
-| `session_blocker` | Novel | DEV / UAT / PROD | 3 |
-| `long_running_sql` | Novel | DEV / UAT / PROD | 3 |
-| `stale_stats` | Novel (proactive) | DEV / UAT / PROD | 3 |
-| `invalid_objects` | Novel | DEV / UAT / PROD | 3 |
-| `failed_jobs` | Novel (harness-limited) | DEV / UAT / PROD | 3 |
-
-Harness-limited note: `failed_jobs` in PROD/UAT uses mock job failure injection; the Oracle scheduler fix SQL is exercised but actual job failure outcome depends on workload.
-
----
+Each alert family has a corresponding seed script in `eval/seeds/` that creates the database condition that triggers the alert. These run automatically as part of `docker compose up`.
 
 ## Adversarial Benchmark
 
-The 82 adversarial cases are designed to test each Safety Mesh check independently.
+The 82 adversarial cases are in `eval/adversarial_cases/`. Each case is a JSON file specifying:
+- Input alert content (crafted to probe a specific Safety Mesh check)
+- Expected Safety Mesh check that should intercept
+- Expected outcome (block / queue / suspend / escalate)
 
-| Safety Check | Cases | Decisions Tested |
-|---|---|---|
-| `blast_radius` | 36 | ALLOW, REQUIRE_APPROVAL |
-| `policy_gate` | 15 | ALLOW, BLOCK, REQUIRE_APPROVAL |
-| `rollback_check` | 13 | ALLOW, BLOCK, REQUIRE_APPROVAL |
-| `conflict_detect` | 10 | ALLOW, QUEUE, REQUIRE_APPROVAL |
-| `circuit_breaker` | 6 | ALLOW, BLOCK |
-| `combined` | 2 | BLOCK |
+## Known vs. Novel Classification
 
-All 82 cases are deterministic (no LLM call) — Safety Mesh enforcement is structural. Re-running produces identical results on any commit at or after `v5.0-ieee-access`.
+For Table 8 in the paper (Known vs. Novel/Ambiguous incident results):
 
----
+**Known/repetitive** (6 families, 18 runs): `tablespace_full`, `temp_full`, `archive_dest_full`, `stale_stats`, `invalid_objects`, `high_undo_usage`
+— These have well-defined template-solvable remediation patterns.
 
-## Seed and Randomness
+**Novel/ambiguous** (2 families, 6 runs): `session_blocker`, `long_running_sql`
+— These require contextual reasoning (blocking-chain analysis, SQL execution-plan interpretation) beyond template capabilities.
 
-- Adversarial cases: fully deterministic (no randomness)
-- Scale evaluation: LLM temperature = 0 for all providers; run order is fixed by `scale_eval.py` scenario list
-- `--seed 42` passed to `run_eval.py` affects any sampling in the harness (not Safety Mesh decisions)
+**Harness-limited** (1 family, 3 runs): `failed_jobs`
+— 0% across all methods due to missing Oracle Scheduler job seeding in Docker XE.
 
----
+## Raw Results
+
+Raw results for each run are in `eval/results/`:
+- `eval/results/full_108_runs.csv` — all 108 method-comparison runs
+- `eval/results/ablation_36_runs.csv` — ablation study runs
+- `eval/results/adversarial_82_cases.csv` — adversarial benchmark results
+- `eval/results/known_novel_breakdown.csv` — per-family classification and counts
 
 ## Environment
 
-| Component | Version |
-|---|---|
-| Python | 3.12 |
-| Oracle | XE 21c (via `gvenzl/oracle-xe:21-slim`) |
-| Claude | `claude-opus-4` (Anthropic API) |
-| GPT-4o | `gpt-4o-2024-08-06` (OpenAI API) |
-| Gemini | `gemini-1.5-pro-latest` (Google AI API) |
-| Sentri | `v5.0-ieee-access` (this tag) |
+- Oracle XE 21c (Docker: `gvenzl/oracle-xe:21-slim`)
+- Python 3.10+
+- LLM backends: Claude Opus 4 (`claude-opus-4`), GPT-4o (`gpt-4o-2024-11-20`), Gemini 1.5 Pro (`gemini-1.5-pro`)
+- API keys required: set `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_API_KEY`
 
----
+## License
 
-## File Layout
-
-```
-eval/
-├── run_eval.py              # Unified evaluation runner
-├── scale_eval.py            # Block 1/2/3 scale + ablation harness
-├── adversarial.py           # Block 4 adversarial harness
-├── harness.py               # Core test harness
-├── runner.py                # Per-scenario runner
-├── formatter.py             # Output formatting
-├── aggregate_results.py     # Aggregate raw JSON → IEEE tables
-└── results/
-    ├── raw_results.csv              # 108 run records (Table I source)
-    ├── known_novel_results.csv      # Claude only, known vs novel (Table II)
-    ├── ablation_results.csv         # 6 conditions × 36 runs (Table III)
-    ├── adversarial_cases.csv        # 82 cases (Table IV)
-    ├── scale_claude_none.json       # Raw: Claude full system (36 runs)
-    ├── scale_openai_none.json       # Raw: GPT-4o full system (36 runs)
-    ├── scale_gemini_none.json       # Raw: Gemini full system (36 runs)
-    ├── scale_claude_no_*.json       # Raw: ablation runs (5 files)
-    ├── adversarial_results_82cases.json  # Raw adversarial results
-    └── ieee_summary.md              # Aggregated paper-ready tables
-
-docker/
-└── docker-compose.yml       # Oracle XE test database
-```
-
----
-
-## Contact
-
-For questions about reproducing results, open an issue on GitHub or email the corresponding author.
+Apache 2.0. See [LICENSE](LICENSE).
