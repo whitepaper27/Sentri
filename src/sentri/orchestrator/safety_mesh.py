@@ -100,6 +100,7 @@ class SafetyMesh:
         audit_repo: "AuditRepository",
         alert_patterns: "AlertPatterns",
         environment_config: Optional["EnvironmentConfig"] = None,
+        disabled_checks: Optional[set] = None,
     ):
         self._rules = rules_engine
         self._db = db
@@ -107,6 +108,15 @@ class SafetyMesh:
         self._audit_repo = audit_repo
         self._alert_patterns = alert_patterns
         self._env_config = environment_config
+        # Ablation support: set of check names to skip.
+        # Valid names: policy_gate, conflict_detect, blast_radius, circuit_breaker, rollback_check
+        # Example: SafetyMesh(..., disabled_checks={"blast_radius", "rollback_check"})
+        self._disabled_checks: set[str] = disabled_checks or set()
+        if self._disabled_checks:
+            logger.warning(
+                "SafetyMesh ablation mode: checks disabled=%s (eval use only)",
+                sorted(self._disabled_checks),
+            )
 
     def check(
         self,
@@ -118,6 +128,8 @@ class SafetyMesh:
 
         Check order: policy gate → conflict → blast radius → circuit breaker → rollback.
         Short-circuits on BLOCK (no point checking further).
+
+        Checks listed in self._disabled_checks are skipped (ablation study use only).
         """
         reasons: list[str] = []
         decision = MeshDecision.ALLOW
@@ -133,6 +145,11 @@ class SafetyMesh:
         ]
 
         for check_name, check_fn in checks:
+            # Ablation: skip disabled checks
+            if check_name in self._disabled_checks:
+                reasons.append(f"[ablation] {check_name} disabled")
+                continue
+
             if check_name == "policy_gate":
                 result = check_fn(workflow, plan, confidence)
             elif check_name in ("conflict_detect", "circuit_breaker"):

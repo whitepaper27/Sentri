@@ -72,3 +72,10 @@ test_env_load.py
 test_sentri_db.py
 send_test_email.py
 nul
+
+# Internal planning docs and throwaway dev scripts
+eval/IEEE_experiment_plan.md
+scripts/
+publish paper/
+brain/autonomy_levels copy.md
+send_test_email copy.py

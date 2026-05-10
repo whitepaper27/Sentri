@@ -50,6 +50,14 @@ class SpecialistBase(BaseAgent):
     Subclasses MAY override: argue(), select(), learn().
     """
 
+    # Ablation modes for argue/select step:
+    #   "full"         — normal cost-gated behaviour (default)
+    #   "single"       — always skip judge, return first candidate (no LLM judge)
+    #   "force_full"   — bypass cost gate, always run full argue/select
+    ARGUE_MODE_FULL = "full"
+    ARGUE_MODE_SINGLE = "single"
+    ARGUE_MODE_FORCE_FULL = "force_full"
+
     def __init__(
         self,
         name: str,
@@ -59,6 +67,7 @@ class SpecialistBase(BaseAgent):
         cost_tracker: Optional["CostTracker"] = None,
         investigation_store: Optional["InvestigationStore"] = None,
         notification_router: Optional["NotificationRouter"] = None,
+        argue_mode: str = "full",
     ):
         super().__init__(name, context)
         self._safety_mesh = safety_mesh
@@ -66,6 +75,12 @@ class SpecialistBase(BaseAgent):
         self._cost_tracker = cost_tracker
         self._investigation_store = investigation_store
         self._notification_router = notification_router
+        # Ablation support: controls argue/select depth
+        self._argue_mode = argue_mode
+        if argue_mode != self.ARGUE_MODE_FULL:
+            logger.warning(
+                "%s ablation mode: argue_mode=%s (eval use only)", name, argue_mode
+            )
 
     # ------------------------------------------------------------------
     # Main orchestration (the 7-step contract)
@@ -335,7 +350,26 @@ class SpecialistBase(BaseAgent):
         | ≥95%        | ≥0.95      | Template (skip) | 0         |
         | 80-95%      | any        | One-shot        | 0 (just pick) |
         | <80% or new | any        | Full argue/select | 1+      |
+
+        Ablation modes (set via argue_mode in __init__):
+          "single"      — always skip judge, return first candidate (no LLM judge)
+          "force_full"  — bypass cost gate, always run full argue/select
+          "full"        — normal cost-gated behaviour (default)
         """
+        # Ablation: single mode — bypass entire cost gate, return first candidate
+        if self._argue_mode == self.ARGUE_MODE_SINGLE:
+            self.logger.info("Ablation single: skipping judge, returning first candidate")
+            return candidates[0] if candidates else max(candidates, key=lambda c: c.confidence)
+
+        # Ablation: force_full mode — bypass cost gate, always run full argue/select
+        if self._argue_mode == self.ARGUE_MODE_FORCE_FULL:
+            self.logger.info("Ablation force_full: bypassing cost gate, running full argue/select")
+            scored = self.argue(candidates, workflow)
+            if scored:
+                return self.select(scored)
+            return max(candidates, key=lambda c: c.confidence)
+
+        # Normal cost-gated path
         success_rate, total = self._get_historical_success_rate(
             workflow.alert_type,
             workflow.database_id,

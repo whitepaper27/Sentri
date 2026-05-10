@@ -52,6 +52,7 @@ class StorageAgent(SpecialistBase):
         cost_tracker: Optional["CostTracker"] = None,
         investigation_store=None,
         notification_router=None,
+        argue_mode: str = "full",
     ):
         super().__init__(
             "storage_agent",
@@ -61,6 +62,7 @@ class StorageAgent(SpecialistBase):
             cost_tracker,
             investigation_store=investigation_store,
             notification_router=notification_router,
+            argue_mode=argue_mode,
         )
         self._auditor = auditor
         self._researcher = researcher

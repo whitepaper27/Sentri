@@ -71,6 +71,7 @@ class RCAAgent(SpecialistBase):
         cost_tracker: Optional["CostTracker"] = None,
         investigation_store=None,
         notification_router=None,
+        argue_mode: str = "full",
     ):
         super().__init__(
             "rca_agent",
@@ -80,6 +81,7 @@ class RCAAgent(SpecialistBase):
             cost_tracker,
             investigation_store=investigation_store,
             notification_router=notification_router,
+            argue_mode=argue_mode,
         )
 
     def verify(self, workflow: Workflow) -> tuple[bool, float]:
